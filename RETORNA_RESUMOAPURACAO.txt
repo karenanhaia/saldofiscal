@@ -1,0 +1,379 @@
+SET TERM ^ ;
+
+CREATE OR ALTER procedure RETORNA_RESUMOAPURACAO (
+    I_CD_EMPRESA integer,
+    I_TP_IMPOSTO varchar(1),
+    I_DT_INICIAL date,
+    I_DT_FINAL date,
+    I_CD_ANOQUEBRA integer,
+    I_CD_MESQUEBRA integer)
+returns (
+    O_VL_IMPSAIDA numeric(15,2),
+    O_VL_OUTROSDEB numeric(15,2),
+    O_VL_ESTORNOCRED numeric(15,2),
+    O_VL_TOTALDEBITO numeric(15,2),
+    O_VL_SALDOCREDANT numeric(15,2),
+    O_VL_IMPENTRADA numeric(15,2),
+    O_VL_OUTROSCRED numeric(15,2),
+    O_VL_ESTORNODEB numeric(15,2),
+    O_VL_TOTALCREDITO numeric(15,2),
+    O_VL_RECOLHER numeric(15,2),
+    O_VL_SALDOCREDOR numeric(15,2))
+as
+declare variable V_ST_ESTADO varchar(1);
+declare variable V_CD_CODRECEITA integer;
+declare variable V_VL_RETIDO numeric(15,2);
+declare variable V_NR_MESATUAL integer;
+declare variable V_VL_PARCIAL numeric(15,2);
+declare variable V_VL_PARCIALD numeric(15,2);
+declare variable V_VL_PARCIALC numeric(15,2);
+declare variable V_DT_ATUAL date;
+declare variable V_ST_CENTRALIZADO varchar(1);
+declare variable V_ST_MATRIZ varchar(1);
+declare variable V_DT_INICIAL date;
+declare variable V_DT_FINAL date;
+begin
+   --[ Busca a Situação da Empresa no Estado ]--
+   select EMPRESA.ST_ESTADO, EMPRESA.ST_MATRIZ
+   from   EMPRESA
+   where  EMPRESA.CD_EMPRESA = :I_CD_EMPRESA
+   into   :V_ST_ESTADO, :V_ST_MATRIZ;
+
+   --[ Verifica se o ICMS é Centralizado ]--
+   select P.ST_ICMSCENTRALIZADO
+   from   PARMFISCAL P
+   where  P.CD_EMPRESA = :I_CD_EMPRESA
+   into   :V_ST_CENTRALIZADO;
+
+--   exception e_geral 'ST_MATRIZ: '||V_ST_MATRIZ;
+--   exception e_geral 'ST_CENTRALIZADO: '||V_ST_CENTRALIZADO;
+--   exception e_geral 'CD_MESQUEBRA: '||I_CD_MESQUEBRA;
+
+   --[ Se o Estabelecimento é Centralizado e For a Filial o Resumo aparece Zerado ]--
+   if (((:V_ST_MATRIZ = 'N') and (:V_ST_CENTRALIZADO = 'S')) or (:I_CD_MESQUEBRA is null)) then begin
+      O_VL_IMPSAIDA     = 0;
+      O_VL_OUTROSDEB    = 0;
+      O_VL_ESTORNOCRED  = 0;
+      O_VL_TOTALDEBITO  = 0;
+      O_VL_SALDOCREDANT = 0;
+      O_VL_IMPENTRADA   = 0;
+      O_VL_OUTROSCRED   = 0;
+      O_VL_ESTORNODEB   = 0;
+      O_VL_TOTALCREDITO = 0;
+      O_VL_RECOLHER     = 0;
+      O_VL_SALDOCREDOR  = 0;
+   end else begin
+      if (:I_CD_MESQUEBRA <> 20) then begin
+         --[ Encontra a Data Inicial se o Relatorio é de Mais de Um ano ]--
+         if (:I_CD_ANOQUEBRA = extract(year from :I_DT_INICIAL)) then
+            V_DT_INICIAL = :I_DT_INICIAL;
+         else
+            V_DT_INICIAL = cast('01/01/'||:I_CD_ANOQUEBRA as date);
+      
+         --[ Encontra a Data Final se o Relatorio é de Mais de Um ano ]--
+         if (:I_CD_ANOQUEBRA = extract(year from :I_DT_FINAL)) then
+            V_DT_FINAL = :I_DT_FINAL;
+         else
+            V_DT_FINAL = cast('12/31/'||:I_CD_ANOQUEBRA as date);
+
+         select R.O_DT_INICIAL, R.O_DT_FINAL
+         from   RETORNA_INTERVALODATA(:V_DT_INICIAL,:V_DT_FINAL,:I_CD_MESQUEBRA,'M') R
+         into   :V_DT_INICIAL, :V_DT_FINAL;
+
+         --[ Se a Empresa é Simples no Estado e Imposto ICMS ]--
+         if ((:V_ST_ESTADO = 'S') and (:I_TP_IMPOSTO = 'I')) then begin
+            O_VL_IMPSAIDA = 0;
+            if (V_DT_FINAL <= '06/30/2007') then begin
+               --[ Busca o Código da Receita ]--
+               V_CD_CODRECEITA = null;
+               select C.CD_CODRECEITA
+               from   CODRECEITA C
+               where  C.CD_EMPRESA = :I_CD_EMPRESA
+               and    C.TP_GUIA    = 'P'
+               into   :V_CD_CODRECEITA;
+               if (:V_CD_CODRECEITA is null) then
+                  exception E_GERAL 'Verifique nos Códigos da Receita o Código do Imposto ICMS [TFI011] !';
+   
+               --[ Busca o Valor do Imposto ]--
+               select O_VL_IMPOSTO
+               from   GERA_DARF(:I_CD_EMPRESA,:V_CD_CODRECEITA,LASTDAYMONTH(:I_CD_MESQUEBRA||'/01/'||:I_CD_ANOQUEBRA),0,null)
+               into   :O_VL_IMPSAIDA;
+            end
+         end else begin
+            --[ Encontra o Valor das Entradas e Saídas nos Saldos ]--
+            V_VL_PARCIALD = 0;
+            V_VL_PARCIALC = 0;
+
+            select sum(S.VL_DEBITO), sum(S.VL_CREDITO)
+            from   SALDOFISCAL S
+            where  S.CD_EMPRESA = :I_CD_EMPRESA
+            and    S.TP_IMPOSTO = :I_TP_IMPOSTO
+            and    trim(S.DT_COMPETENCIA) = trim(PADLEFT(:I_CD_MESQUEBRA,2,'0')||'/'||:I_CD_ANOQUEBRA)
+            INTO   :V_VL_PARCIALD, :V_VL_PARCIALC;
+
+            O_VL_IMPSAIDA   = coalesce(:O_VL_IMPSAIDA  ,0) + coalesce(:V_VL_PARCIALD,0);
+            O_VL_IMPENTRADA = coalesce(:O_VL_IMPENTRADA,0) + coalesce(:V_VL_PARCIALC,0);
+         end
+
+         --[ Outros Débitos ]--
+         select sum(M.VL_DOCUMENTO)
+         from   MOVTOFISCAL M
+         where  M.CD_EMPRESA = :I_CD_EMPRESA
+         and    M.TP_IMPOSTO = :I_TP_IMPOSTO
+         and    M.TP_MOVTOFISCAL = 'O'
+         and    M.ST_MOVTOFISCAL = 'D'
+         and    M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
+         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+         into   :O_VL_OUTROSDEB;
+
+         --[ Estorno de Créditos ]--
+         select sum(M.VL_DOCUMENTO)
+         from MOVTOFISCAL M
+         where M.CD_EMPRESA     = :I_CD_EMPRESA
+         and   M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
+         and   M.TP_IMPOSTO     = :I_TP_IMPOSTO
+         and   M.TP_MOVTOFISCAL = 'E'
+         and   M.ST_MOVTOFISCAL = 'C'
+         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+         into  :O_VL_ESTORNOCRED;
+
+         --[ Se nao encontrou valor de Imposto, soma os Lancamentos Avulsos ]--
+         if (coalesce(:O_VL_IMPSAIDA,0) = 0) then
+            O_VL_IMPSAIDA = coalesce(:O_VL_OUTROSDEB,0) + coalesce(:O_VL_ESTORNOCRED,0);
+
+         --[ Outros Créditos ]--
+         select sum(M.VL_DOCUMENTO)
+         from MOVTOFISCAL M
+         where M.CD_EMPRESA     = :I_CD_EMPRESA
+         and   M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
+         and   M.TP_IMPOSTO     = :I_TP_IMPOSTO
+         and   M.TP_MOVTOFISCAL = 'O'
+         and   M.ST_MOVTOFISCAL = 'C'
+         --and   M.ST_ORIGEM <> 'C'
+         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+         into  :O_VL_OUTROSCRED;
+
+         --[ Imposto Retido ]--
+         select sum(IR.VL_IMPOSTO)
+         from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
+                                 ' AND N.DT_EMISSAO BETWEEN '''||:V_DT_INICIAL||''' AND '''||:V_DT_FINAL||''' '||
+                                 ' AND IT.TP_NOTA   = ''S'' ',
+                                 ' AND IP.TP_IMPOSTO = '''||:I_TP_IMPOSTO||''' AND IP.ST_RETIDO = ''S'' ',
+                                 ' AND N.CD_EMPRESA = -1 AND 1 = 2 ') IR
+         where extract(month from IR.DT_EMISSAO) = :I_CD_MESQUEBRA
+         into  :V_VL_RETIDO;
+
+         --[ Estorno de Débitos ]--
+         select sum(M.VL_DOCUMENTO)
+         from MOVTOFISCAL M
+         where M.CD_EMPRESA     = :I_CD_EMPRESA
+         and   M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
+         and   M.TP_IMPOSTO     = :I_TP_IMPOSTO
+         and   M.TP_MOVTOFISCAL = 'E'
+         and   M.ST_MOVTOFISCAL = 'D'
+         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+         into  :O_VL_ESTORNODEB;
+
+         --[ Saldo Credor Anterior ]--
+         select  (S.VL_SALDOANTERIOR * -1)
+         from   SALDOFISCAL S
+         where  S.CD_EMPRESA = :I_CD_EMPRESA
+         and    S.TP_IMPOSTO = :I_TP_IMPOSTO
+         and    S.DT_COMPETENCIA = PADLEFT(:I_CD_MESQUEBRA,2,'0')||'/'||:I_CD_ANOQUEBRA
+         into   :O_VL_SALDOCREDANT;
+
+         if (O_VL_SALDOCREDANT is null) then
+            --[ Saldo Credor Anterior ]--
+            select FIRST 1 (S.VL_SALDOIMPOSTO * -1)
+            from   SALDOFISCAL S
+            where  S.CD_EMPRESA = :I_CD_EMPRESA
+            and    S.TP_IMPOSTO = :I_TP_IMPOSTO
+            and   cast('01.'||s.dt_competencia as date) <= CAST('01.'||PADLEFT(cast(:I_CD_MESQUEBRA as integer),2,'0')||'.'||cast(:I_CD_ANOQUEBRA as integer) AS DATE)
+            ORDER BY S.DT_SALDO  DESC
+            --ORDER BY CAST('01.'||PADLEFT(cast(:I_CD_MESQUEBRA as integer),2,'0')||'.'||cast(:I_CD_ANOQUEBRA as integer) AS DATE) DESC
+            into   :O_VL_SALDOCREDANT;
+
+         if (:O_VL_SALDOCREDANT < 0) then
+            O_VL_SALDOCREDANT = 0;
+
+         --[ Quando não tem crédito nas compras ]--
+         if (coalesce(:O_VL_IMPENTRADA,0) = 0) then
+            O_VL_IMPENTRADA = coalesce(:O_VL_OUTROSCRED,0) + coalesce(:O_VL_ESTORNODEB,0);-- + coalesce(:V_VL_RETIDO,0);
+
+         --[ Total de Débitos ]--
+         O_VL_TOTALDEBITO = coalesce(:O_VL_IMPSAIDA,0);
+         O_VL_IMPSAIDA    = coalesce(:O_VL_IMPSAIDA,0) - coalesce(:O_VL_OUTROSDEB,0) - coalesce(:O_VL_ESTORNOCRED,0);
+
+         --[ Total de Créditos ]--
+         O_VL_TOTALCREDITO = coalesce(:O_VL_IMPENTRADA,0) + coalesce(:O_VL_SALDOCREDANT,0);
+         O_VL_IMPENTRADA   = coalesce(:O_VL_IMPENTRADA,0) - coalesce(:O_VL_OUTROSCRED,0) -
+                             coalesce(:O_VL_ESTORNODEB,0);-- - coalesce(:V_VL_RETIDO,0);
+
+         --[ Outros Créditos ]--
+         select sum(M.VL_DOCUMENTO)
+         from MOVTOFISCAL M
+         where M.CD_EMPRESA     = :I_CD_EMPRESA
+         and   M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
+         and   M.TP_IMPOSTO     = :I_TP_IMPOSTO
+         and   M.TP_MOVTOFISCAL = 'O'
+         and   M.ST_MOVTOFISCAL = 'C'
+         and   M.ST_ORIGEM <> 'C'
+         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+         into  :O_VL_OUTROSCRED;
+
+         --[ Imposto a Recolher ou Imposto Credor ]--
+         if ((:O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO) > 0) then begin
+            O_VL_RECOLHER = :O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO;
+            O_VL_SALDOCREDOR = 0;
+         end else begin
+            O_VL_RECOLHER = 0;
+            O_VL_SALDOCREDOR = :O_VL_TOTALCREDITO - :O_VL_TOTALDEBITO;
+         end
+
+      --[ Não Efetuou a Quebra por Mês ]--
+      end else begin
+
+         --[ Se a Empresa é Simples no Estado e Imposto ICMS ]--
+         if ((:V_ST_ESTADO = 'S') and (:I_TP_IMPOSTO = 'I')) then begin
+            O_VL_IMPSAIDA = 0;
+            if (:I_DT_FINAL <= '06/30/2007') then begin
+               --[ Busca o Código da Receita ]--
+               V_CD_CODRECEITA = null;
+               select C.CD_CODRECEITA
+               from   CODRECEITA C
+               where  C.CD_EMPRESA = :I_CD_EMPRESA
+               and    C.TP_GUIA    = 'P'
+               into   :V_CD_CODRECEITA;
+               if (:V_CD_CODRECEITA is null) then
+                  exception E_GERAL 'Verifique nos Códigos da Receita o Código do Imposto ICMS [TFI011] !';
+   
+               --[ Busca o Valor do Imposto ]--
+               V_NR_MESATUAL = extract(month from :I_DT_INICIAL);
+               while (:V_NR_MESATUAL <= extract(month from :I_DT_FINAL)) do begin
+                  select O_VL_IMPOSTO
+                  from   GERA_DARF(:I_CD_EMPRESA,:V_CD_CODRECEITA,LASTDAYMONTH(:V_NR_MESATUAL||'/01/'||extract(year from :I_DT_FINAL)),0,null)
+                  into   :V_VL_PARCIAL;
+                  O_VL_IMPSAIDA = coalesce(:O_VL_IMPSAIDA,0) + coalesce(:V_VL_PARCIAL,0);
+                  V_NR_MESATUAL = :V_NR_MESATUAL + 1;
+               end
+            end
+         end else begin
+            --[ Encontra o Valor das Entradas e Saídas nos Saldos ]--
+            V_DT_ATUAL = LASTDAYMONTH(:I_DT_INICIAL);
+            V_VL_PARCIALD = 0;
+            V_VL_PARCIALC = 0;
+            while (:V_DT_ATUAL <= LASTDAYMONTH(:I_DT_FINAL)) do begin
+               select sum(S.VL_DEBITO), sum(S.VL_CREDITO)
+               from   SALDOFISCAL S
+               where  S.CD_EMPRESA = :I_CD_EMPRESA
+               and    S.TP_IMPOSTO = :I_TP_IMPOSTO
+               and    S.DT_COMPETENCIA = DATETOSTR(:V_DT_ATUAL,'%m/%Y')
+               into   :V_VL_PARCIALD, :V_VL_PARCIALC;
+               O_VL_IMPSAIDA   = coalesce(:O_VL_IMPSAIDA  ,0) + coalesce(:V_VL_PARCIALD,0);
+               O_VL_IMPENTRADA = coalesce(:O_VL_IMPENTRADA,0) + coalesce(:V_VL_PARCIALC,0);
+               V_DT_ATUAL = LASTDAYMONTH(INCDATE(:V_DT_ATUAL,0,1,0));
+            end
+         end
+
+         --[ Outros Débitos ]--
+         select sum(M.VL_DOCUMENTO)
+         from   MOVTOFISCAL M
+         where  M.CD_EMPRESA = :I_CD_EMPRESA
+         and    M.TP_IMPOSTO = :I_TP_IMPOSTO
+         and    M.TP_MOVTOFISCAL = 'O'
+         and    M.ST_MOVTOFISCAL = 'D'
+         and    M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
+         into   :O_VL_OUTROSDEB;
+
+         --[ Estorno de Créditos ]--
+         select sum(M.VL_DOCUMENTO)
+         from MOVTOFISCAL M
+         where M.CD_EMPRESA     = :I_CD_EMPRESA
+         and   M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
+         and   M.TP_IMPOSTO     = :I_TP_IMPOSTO
+         and   M.TP_MOVTOFISCAL = 'E'
+         and   M.ST_MOVTOFISCAL = 'C'
+         into  :O_VL_ESTORNOCRED;
+
+         --[ Outros Créditos ]--
+         select sum(M.VL_DOCUMENTO)
+         from MOVTOFISCAL M
+         where M.CD_EMPRESA     = :I_CD_EMPRESA
+         and   M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
+         and   M.TP_IMPOSTO     = :I_TP_IMPOSTO
+         and   M.TP_MOVTOFISCAL = 'O'
+         and   M.ST_MOVTOFISCAL = 'C'
+         into  :O_VL_OUTROSCRED;
+
+         --[ Imposto Retido ]--
+         select sum(IR.VL_IMPOSTO)
+         from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
+                                 ' AND N.DT_EMISSAO BETWEEN '''||:I_DT_INICIAL||''' AND '''||:I_DT_FINAL||''' '||
+                                 ' AND N.TP_NOTA    = ''S'' ',
+                                 ' AND IP.TP_IMPOSTO = '''||:I_TP_IMPOSTO||''' AND IP.ST_RETIDO = ''S'' ',
+                                 ' AND N.CD_EMPRESA = -1 AND 1 = 2 ') IR
+         into  :V_VL_RETIDO;
+
+         --[ Estorno de Débitos ]--
+         select sum(M.VL_DOCUMENTO)
+         from MOVTOFISCAL M
+         where M.CD_EMPRESA     = :I_CD_EMPRESA
+         and   M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
+         and   M.TP_IMPOSTO     = :I_TP_IMPOSTO
+         and   M.TP_MOVTOFISCAL = 'E'
+         and   M.ST_MOVTOFISCAL = 'D'
+         into  :O_VL_ESTORNODEB;
+
+         --[ Se nao encontrou valor de Imposto, soma os Lancamentos Avulsos ]--
+         if (coalesce(:O_VL_IMPSAIDA,0) = 0) then
+            O_VL_IMPSAIDA = coalesce(:O_VL_OUTROSDEB,0) + coalesce(:O_VL_ESTORNOCRED,0);
+
+         --[ Saldo Credor Anterior ]--
+         select (S.VL_SALDOANTERIOR * -1)
+         from   SALDOFISCAL S
+         where  S.CD_EMPRESA = :I_CD_EMPRESA
+         and    S.TP_IMPOSTO = :I_TP_IMPOSTO
+         and    S.DT_COMPETENCIA = DATETOSTR(:I_DT_INICIAL,'%m/%Y')
+         into   :O_VL_SALDOCREDANT;
+         if (:O_VL_SALDOCREDANT < 0) then
+            O_VL_SALDOCREDANT = 0;
+
+         --[ Quando não tem crédito nas compras ]--
+         if (coalesce(:O_VL_IMPENTRADA,0) = 0) then
+            O_VL_IMPENTRADA = coalesce(:O_VL_OUTROSCRED,0) + coalesce(:O_VL_ESTORNODEB,0);-- + coalesce(:V_VL_RETIDO,0);
+
+         --[ Total de Débitos ]--
+         O_VL_TOTALDEBITO = coalesce(:O_VL_IMPSAIDA,0);
+         O_VL_IMPSAIDA    = coalesce(:O_VL_IMPSAIDA,0) - coalesce(:O_VL_OUTROSDEB,0) - coalesce(:O_VL_ESTORNOCRED,0);
+
+         --[ Total de Créditos ]--
+         O_VL_TOTALCREDITO = coalesce(:O_VL_IMPENTRADA,0) + coalesce(:O_VL_SALDOCREDANT,0);
+         O_VL_IMPENTRADA   = coalesce(:O_VL_IMPENTRADA,0) - coalesce(:O_VL_OUTROSCRED,0) -
+                             coalesce(:O_VL_ESTORNODEB,0) - coalesce(:V_VL_RETIDO,0);
+
+         --[ Imposto a Recolher ou Imposto Credor ]--
+         if ((:O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO) > 0) then begin
+            O_VL_RECOLHER = :O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO;
+            O_VL_SALDOCREDOR = 0;
+         end else begin
+            O_VL_RECOLHER = 0;
+            O_VL_SALDOCREDOR = :O_VL_TOTALCREDITO - :O_VL_TOTALDEBITO;
+         end
+      end
+   end
+   O_VL_IMPSAIDA     = coalesce(:O_VL_IMPSAIDA,0);
+   O_VL_OUTROSDEB    = coalesce(:O_VL_OUTROSDEB,0);
+   O_VL_ESTORNOCRED  = coalesce(:O_VL_ESTORNOCRED,0);
+   O_VL_TOTALDEBITO  = coalesce(:O_VL_TOTALDEBITO,0);
+   O_VL_SALDOCREDANT = coalesce(:O_VL_SALDOCREDANT,0);
+   O_VL_IMPENTRADA   = coalesce(:O_VL_IMPENTRADA,0);
+   O_VL_OUTROSCRED   = coalesce(:O_VL_OUTROSCRED,0);
+   O_VL_ESTORNODEB   = coalesce(:O_VL_ESTORNODEB,0);
+   O_VL_TOTALCREDITO = coalesce(:O_VL_TOTALCREDITO,0);
+   O_VL_RECOLHER     = coalesce(:O_VL_RECOLHER,0);
+   O_VL_SALDOCREDOR  = coalesce(:O_VL_SALDOCREDOR,0);
+   suspend;
+end^
+
+SET TERM ; ^
+

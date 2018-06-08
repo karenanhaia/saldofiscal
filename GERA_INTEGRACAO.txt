@@ -1,0 +1,1112 @@
+SET TERM ^ ;
+
+CREATE OR ALTER procedure GERA_INTEGRACAO (
+    I_CD_EMPRESA integer,
+    I_NR_LANCAMENTO integer,
+    I_CD_SERIE varchar(4),
+    I_TP_NOTA char(1),
+    I_NR_NOTAFISCAL integer,
+    I_DT_INICIAL date,
+    I_DT_FINAL date,
+    I_TP_INTEGRACAO char(1))
+returns (
+    V_DS_MENSAGEM varchar(2000))
+as
+declare variable V_DT_INTEGRADO date;
+declare variable V_DS_WHERE varchar(2000);
+declare variable V_DS_WHERECONTAS varchar(2000);
+declare variable V_DS_WHERECAIXA varchar(2000);
+declare variable V_DS_CONSULTA varchar(5000);
+declare variable V_DS_CONSULTA_CON varchar(2000);
+declare variable V_CD_EMPRESA integer;
+declare variable V_NR_LANCAMENTO integer;
+declare variable V_CD_SERIE varchar(4);
+declare variable V_TP_NOTA char(1);
+declare variable V_NM_PESSOA varchar(60);
+declare variable V_NR_CNPJCPF varchar(22);
+declare variable V_NR_INSCEST varchar(20);
+declare variable V_DS_ENDERECO varchar(60);
+declare variable V_DS_MUNICIPIO varchar(60);
+declare variable V_SG_ESTADO varchar(2);
+declare variable V_DS_CONDPAGTO varchar(60);
+declare variable V_DS_FORMAPAGTO varchar(60);
+declare variable V_NR_NOTAFISCAL integer;
+declare variable V_ST_EMISSAOPROPRIA char(1);
+declare variable V_CD_ESPECIE varchar(4);
+declare variable V_ST_NOTA char(1);
+declare variable V_NR_CUPOMFISCAL integer;
+declare variable V_DT_EMISSAO date;
+declare variable V_TP_PAGTOFRETE char(1);
+declare variable V_PS_BRUTO numeric(15,3);
+declare variable V_PS_LIQUIDO numeric(15,3);
+declare variable V_QT_VOLUME numeric(15,3);
+declare variable V_VL_DESCONTO numeric(15,2);
+declare variable V_VL_FRETE numeric(15,2);
+declare variable V_VL_DESPESA numeric(15,2);
+declare variable V_VL_CONTABIL numeric(15,2);
+declare variable V_VL_NOTAFISCAL numeric(15,2);
+declare variable V_SQ_ITEM integer;
+declare variable V_CD_MOVIMENTACAO integer;
+declare variable V_CD_CFO integer;
+declare variable V_CD_CST integer;
+declare variable V_CD_ORIGEM integer;
+declare variable V_CD_OBSFISCAL integer;
+declare variable V_DS_OBSFISCALITEM varchar(240);
+declare variable V_PS_ITEMNOTA numeric(15,3);
+declare variable V_QT_ITEMNOTA numeric(15,2);
+declare variable V_VL_UNITARIO numeric(15,2);
+declare variable V_VL_TOTAL numeric(15,2);
+declare variable V_VL_DESCITEM numeric(15,2);
+declare variable V_VL_FRETEITEM numeric(15,2);
+declare variable V_VL_DESPITEM numeric(15,2);
+declare variable V_PC_ICMS numeric(3,2);
+declare variable V_PC_IPI numeric(3,2);
+declare variable V_ST_FISCAL char(1);
+declare variable V_ST_CONTABIL char(1);
+declare variable V_ST_DEVOLUCAO char(1);
+declare variable V_CD_CONTADEBITO integer;
+declare variable V_CD_CONTACREDITO integer;
+declare variable V_DS_HISTORICO varchar(60);
+declare variable V_CD_ITEM integer;
+declare variable V_NR_NCM bigint;
+declare variable V_DS_ITEM varchar(60);
+declare variable V_SG_UNIDMED varchar(3);
+declare variable V_NR_LANCCONTAS integer;
+declare variable V_TP_TIPOCONTA varchar(2);
+declare variable V_NR_PARCELA integer;
+declare variable V_NM_PESSOACONTAS varchar(60);
+declare variable V_DS_FORMAPAGTOCONTAS varchar(60);
+declare variable V_NR_DOCUMENTO integer;
+declare variable V_DT_LANCAMENTO date;
+declare variable V_DT_VENCIMENTO date;
+declare variable V_VL_DOCUMENTO numeric(15,2);
+declare variable V_VL_SALDO numeric(15,2);
+declare variable V_ST_CONTAS char(1);
+declare variable V_NR_LANCCAIXA integer;
+declare variable V_DS_COMPLEMENTO varchar(240);
+declare variable V_NR_DOCCAIXA integer;
+declare variable V_VL_DOCCAIXA numeric(15,2);
+declare variable V_DT_ESTORNO date;
+declare variable V_DT_LANCCAIXA date;
+declare variable V_ST_ESTORNO char(1);
+declare variable V_TP_MOVTOCAIXA char(1);
+declare variable V_CD_CONTADEBCAIXA integer;
+declare variable V_CD_CONTACREDCAIXA integer;
+declare variable V_NR_CHAVEACESSO char(44);
+declare variable V_CSTAT varchar(12);
+declare variable V_DS_DUPLICATA varchar(250);
+declare variable V_DS_AVULSO varchar(256);
+declare variable V_TP_CONTABILIZACAO char(1);
+declare variable V_CD_CONTAPAICLI integer;
+declare variable V_CD_CONTAPAIFOR integer;
+declare variable V_CD_CONTACLI integer;
+declare variable V_CD_CONTAFOR integer;
+declare variable V_DS_MASCARA varchar(40);
+declare variable V_CD_PESSOA integer;
+declare variable V_CD_CONTADEBEST integer;
+declare variable V_CD_CONTACREDEST integer;
+declare variable V_CD_HISTCOMISSAO integer;
+declare variable V_CD_HISTDESPESA integer;
+declare variable V_ST_CONDPAGTO char(1);
+declare variable V_DS_HISTESTOQUE varchar(60);
+declare variable V_VL_LIQUIDO numeric(15,2);
+declare variable V_VL_COMISSAO numeric(15,2);
+declare variable V_CD_OPERACAO integer;
+declare variable V_VL_CUSTO numeric(15,2);
+declare variable V_TP_ITEM char(1);
+declare variable V_CD_DFC integer;
+declare variable V_CD_PESSOAN integer;
+declare variable V_NM_PESSOAN varchar(60);
+declare variable V_NR_CNPJCPFPN varchar(22);
+declare variable V_CD_SERIENF varchar(4);
+declare variable V_CD_USUARIO varchar(5);
+declare variable V_NR_SERIE varchar(25);
+declare variable V_NR_EQUIPAMENTO varchar(4);
+declare variable V_TP_TRIBUTACAO varchar(4);
+declare variable V_CD_EMPRMOVTOCONTABIL integer;
+declare variable V_NR_LANCTOMOVTOCONTABIL bigint;
+declare variable V_CD_TIPOCONTA integer;
+declare variable V_DT_FORNECEDOR date;
+declare variable V_NR_PROCESSO integer;
+declare variable V_CD_HISTORICO integer;
+declare variable V_VL_HISTORICO numeric(15,2);
+declare variable V_VL_JURO numeric(15,2);
+declare variable V_CD_CONTAJURO integer;
+declare variable V_CD_HISTJURO integer;
+declare variable V_CD_FORMAPAGTO varchar(2);
+declare variable V_CD_HISTESTOQUE integer;
+declare variable V_VL_JUROVENDA numeric(15,2);
+declare variable V_NR_REPARCELAMENTO integer;
+declare variable V_CD_CONTADESPESAE integer;
+declare variable V_CD_CONTADESPESAS integer;
+declare variable V_CD_CONTATROCA integer;
+declare variable V_CD_HISTREPARCELAMENTO integer;
+declare variable V_ST_REPARCELAMENTO char(1);
+declare variable V_TP_DOCUMENTO varchar(2);
+declare variable V_DS_SERVICO varchar(5000);
+declare variable V_ST_CUPOMFISCAL char(1);
+declare variable V_CD_REMETENTE DOM_INTEGER;
+declare variable V_CD_CONSIGNATARIO DOM_INTEGER;
+declare variable V_ST_SPEDCONTRIBUICAO char(1);
+declare variable V_COUNT DOM_INTEGER;
+declare variable V_ST_HIST_CONTABILIZA char(1);
+declare variable V_ST_VARIOSVENDEDORES char(1);
+declare variable V_ST_CONTABILIZAAGRUPADO DOM_CHAR1;
+declare variable V_DS_OBSNOTA DOM_BLOBTEXT;
+declare variable V_DS_OBSFISCALNOTA DOM_BLOBTEXT;
+declare variable V_CD_EMPPROC DOM_INTEGER;
+declare variable V_CD_PESSOACONTA DOM_INTEGER;
+declare variable V_CD_CSOSN DOM_INTEGER;
+BEGIN
+
+   IF ( I_TP_INTEGRACAO IS NULL ) THEN BEGIN
+      V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'O TIPO DA INTEGRA«√O DEVE SER INFORMADO.';
+   END ELSE IF ( I_CD_EMPRESA IS NULL ) THEN BEGIN
+      V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A EMPRESA DEVE SER INFORMADA.';
+   END ELSE
+      IF (( I_CD_SERIE IS NULL ) AND ( STRPOS('A',I_TP_INTEGRACAO) = 0 )) THEN BEGIN
+         IF ( (I_DT_INICIAL IS NULL) OR (I_DT_FINAL IS NULL) ) THEN
+            V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A DATA INICIAL E FINAL DEVEM SER INFORMADAS.';
+      END
+   IF ( V_DS_MENSAGEM IS NOT NULL ) THEN BEGIN
+      SUSPEND;
+      EXIT;
+   END
+   --[ VERIFICA O TIPO CONTAB. DAS CONTAS DE CLIENTES E FORNEC. ]--
+   SELECT P.TP_CONTABILIZACAO, CD_CONTACLI, CD_CONTAFOR, DS_MASCARA, ST_CONTABILIZAAGRUPADO
+   FROM PARMCONTABIL P
+   WHERE P.CD_EMPRESA = :I_CD_EMPRESA
+   INTO V_TP_CONTABILIZACAO,V_CD_CONTAPAICLI,V_CD_CONTAPAIFOR,V_DS_MASCARA, :V_ST_CONTABILIZAAGRUPADO;
+
+   IF (V_TP_CONTABILIZACAO IS NULL) THEN
+      V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'O TIPO DE CONTABILIZA«√O N√O EST¡ CADASTRADO, VERIFIQUE OS PAR¬METROS CON¡BEIS [MCB001]!';
+   IF (V_CD_CONTAPAICLI IS NULL) THEN
+      V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A CONTA DE CLIENTES N√O EST¡ CADASTRADA, VERIFIQUE OS PAR¬METROS CONT¡BEIS [MCB001]!';
+   IF (V_CD_CONTAPAIFOR IS NULL) THEN
+      V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A CONTA DE FORNECEDORES N√O EST¡ CADASTRADA, VERIFIQUE OS PAR¬METROS CONT¡BEIS [MCB001]!';
+   IF (V_DS_MASCARA IS NULL) THEN
+      V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A M¡ÅSCARA DO PLANO DE CONTAS N√O EST¡ CADASTRADA, VERIFIQUE OS PAR¬METROS CONT¡BEIS [MCB001]!';
+   --[ ATUALIZA A TABELA DO PERIODO INTEGRADO ]--
+   IF ( I_TP_INTEGRACAO in ('S','E','A','T','N','F','V','D','Q') ) THEN BEGIN
+      V_DT_INTEGRADO  = I_DT_INICIAL;
+      WHILE ( V_DT_INTEGRADO <= I_DT_FINAL ) DO BEGIN
+         UPDATE INTEGRADOCTB
+         SET    INTEGRADOCTB.TP_INTEGRACAO = :I_TP_INTEGRACAO,
+                INTEGRADOCTB.DT_REGISTRO   = 'NOW'
+         WHERE  INTEGRADOCTB.CD_EMPRESA    = :I_CD_EMPRESA
+         AND    INTEGRADOCTB.DT_INTEGRACAO = :V_DT_INTEGRADO;
+         IF ( ROW_COUNT = 0 ) THEN
+            INSERT INTO INTEGRADOCTB (CD_EMPRESA,    DT_INTEGRACAO,   TP_INTEGRACAO,  DT_REGISTRO)
+                              VALUES (:I_CD_EMPRESA, :V_DT_INTEGRADO, :I_TP_INTEGRACAO, 'NOW');
+         V_DT_INTEGRADO = V_DT_INTEGRADO + 1;
+      END
+   END
+   --[ BUSCA PARAMETROS DO FATURAMENTO ]--
+   SELECT P.CD_CONTADESPESAE, P.CD_CONTADESPESAS, P.ST_VARIOSVENDEDORES
+   FROM   PARMFATUR P
+   WHERE  P.CD_EMPRESA = :I_CD_EMPRESA
+   INTO   :V_CD_CONTADESPESAE, :V_CD_CONTADESPESAS,:V_ST_VARIOSVENDEDORES;
+   --[ BUSCA PARAMETROS DO FINANCEIRO ]--
+   SELECT P.CD_HISTREPARCELAMENTO
+   FROM   PARMFINANC P
+   WHERE  P.CD_EMPRESA = :I_CD_EMPRESA
+   INTO   :V_CD_HISTREPARCELAMENTO;
+   --[ BUSCA PARAMETROS DO FISCAL ]--
+   SELECT P.ST_CUPOMFISCAL
+   FROM   PARMFISCAL P
+   WHERE  P.CD_EMPRESA = :I_CD_EMPRESA
+   INTO   :V_ST_CUPOMFISCAL;
+   --[ BUSCA OS PARAMETROS DE CONTABILIZA«√O DE COMPLEMENTO ]--
+   SELECT P.DS_DUPLICATAS, P.DS_AVULSO
+   FROM PARMCOMPLEMENTO P
+   WHERE P.CD_EMPRESA = :I_CD_EMPRESA
+   INTO  :V_DS_DUPLICATA, :V_DS_AVULSO;
+
+   IF (V_DS_DUPLICATA IS NULL) THEN BEGIN
+      V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'OS PAR√METROS DE COMPLEMENTO N√O EST√O CADASTRADOS [TCB013]!';
+      SUSPEND; EXIT;
+   END
+   --[ BUSCA O USU¡ÅRIO ATUAL LOGADO ]--
+   SELECT S.CD_USUARIO
+   FROM   SESSAO S
+   WHERE  S.NR_CONEXAO = CURRENT_CONNECTION
+   INTO   :V_CD_USUARIO;
+
+   --[ MONTA O COMPLEMENTO P/ DUPLICATAS ]--
+   V_DS_DUPLICATA = ''''||V_DS_DUPLICATA||'''';
+   V_DS_DUPLICATA = STRREPLACE(STRREPLACE(STRREPLACE(V_DS_DUPLICATA,'%D','''||COALESCE(C.NR_DOCUMENTO  ,'''')||''')
+                                                                   ,'%C','''||COALESCE(C.DS_OBSERVACAO ,'''')||''')
+                                                                   ,'%N','''||COALESCE(P.NM_PESSOA     ,'''')||''');
+   V_DS_DUPLICATA = 'CAST(SUBSTRING('||V_DS_DUPLICATA||' FROM 1 FOR 120) AS VARCHAR(120))';
+   --[ MONTA O COMPLEMENTO PARA AVULSOS ]--
+   V_DS_AVULSO = ''''||V_DS_AVULSO||'''';
+   V_DS_AVULSO = STRREPLACE(STRREPLACE(STRREPLACE(V_DS_AVULSO,'%D','''||COALESCE(X.NR_DOCUMENTO  ,'''')||''')
+                                                             ,'%H','''||COALESCE(H.DS_HISTORICO  ,'''')||''')
+                                                             ,'%C','''||COALESCE(X.DS_COMPLEMENTO,'''')||''');
+   V_DS_AVULSO = 'CAST(SUBSTRING('||V_DS_AVULSO||' FROM 1 FOR 150) AS VARCHAR(150))';
+   --[ SA√çDAS E LAN«AMENTOS AVULSOS ]--
+   IF ( I_TP_INTEGRACAO IN ('S','V')) THEN BEGIN
+      V_DS_WHERE       = ' AND N.TP_NOTA   = ''S''';
+      V_DS_WHERECONTAS = ' AND C.TP_CONTAS = ''S''';
+   --[ ENTRADAS E LAN«AMENTOS AVULSOS ]--
+   END ELSE IF ( I_TP_INTEGRACAO IN ('E','D')) THEN BEGIN
+      V_DS_WHERE       = ' AND N.TP_NOTA   = ''E''';
+      V_DS_WHERECONTAS = ' AND C.TP_CONTAS = ''E''';
+   --[ SOMENTE UMA NOTA FISCAL ]--
+   END ELSE IF ( I_TP_INTEGRACAO = 'N') THEN BEGIN
+      V_DS_WHERE       = ' AND N.TP_NOTA   = '''||I_TP_NOTA||''''||
+                         ' AND N.CD_SERIE  = '''||I_CD_SERIE||'''';
+      V_DS_WHERECONTAS = ' AND C.TP_CONTAS = '''||I_TP_NOTA||''''||
+                         ' AND C.CD_SERIE  = '''||I_CD_SERIE||'''';
+      IF ( I_NR_NOTAFISCAL IS NOT NULL ) THEN
+         V_DS_WHERE = V_DS_WHERE||' AND N.NR_NOTAFISCAL = '||I_NR_NOTAFISCAL;
+      IF ( I_NR_LANCAMENTO IS NOT NULL ) THEN BEGIN
+         V_DS_WHERE = V_DS_WHERE||' AND N.NR_LANCAMENTO = '||I_NR_LANCAMENTO;
+         V_DS_WHERECONTAS = V_DS_WHERECONTAS||' AND C.NR_LANCTONOTA = '||I_NR_LANCAMENTO;
+      END
+   END
+   IF ( I_CD_SERIE IS NULL ) THEN BEGIN
+      V_DS_WHERE = ' AND N.DT_EMISSAO BETWEEN '''||I_DT_INICIAL||''' AND '''||I_DT_FINAL||'''';
+      V_DS_WHERECONTAS = ' AND C.DT_LANCAMENTO BETWEEN '''||I_DT_INICIAL||''' AND '''||I_DT_FINAL||'''';
+   END
+
+   IF ( I_TP_INTEGRACAO NOT IN ('A','C') ) THEN BEGIN
+      --[ BUSCA TODAS AS NOTAS FISCAIS QUE FORAM LANCADAS NO MFI005 ]--
+      V_DS_CONSULTA = ' SELECT N.CD_EMPRESA, N.NR_LANCAMENTO, N.CD_SERIE, N.TP_NOTA, N.CD_PESSOA, N.NM_PESSOA, N.NR_CNPJCPF '||
+                      ' FROM   NOTACTB N '||
+                      ' WHERE  N.CD_EMPRESA = '||I_CD_EMPRESA||
+                      ' AND    N.TP_LANCAMENTO = ''D'' '||COALESCE(V_DS_WHERE,'');
+      FOR EXECUTE STATEMENT V_DS_CONSULTA
+          INTO :V_CD_EMPRESA, :V_NR_LANCAMENTO, :V_CD_SERIE, :V_TP_NOTA, :V_CD_PESSOAN, :V_NM_PESSOAN, :V_NR_CNPJCPFPN
+      DO BEGIN
+         --[ ATUALIZA OS DADOS DA NOTA FISCAL COM OS PAR¬METROS ]--
+         IF (:V_CD_PESSOAN IS NOT NULL) THEN BEGIN
+            SELECT O_DS_MENSAGEM
+            FROM   ATUALIZA_NOTACTB(:V_CD_EMPRESA,:V_NR_LANCAMENTO,:V_TP_NOTA,:V_CD_SERIE,:V_CD_PESSOAN, :V_NR_CNPJCPFPN, :V_NM_PESSOAN)
+            INTO   :V_DS_MENSAGEM;
+            --[ CASO OCORRA ALGUM ERRO ]--
+            IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+               SUSPEND;
+               EXIT;
+            END
+         END
+         --[ GERA O MOVIMENTO CONT¡ÅBIL ]--
+         SELECT V_DS_MENSAGEM
+         FROM GERA_MOVTOCONTABIL(:V_CD_EMPRESA,:V_NR_LANCAMENTO,:V_CD_SERIE,:V_TP_NOTA,NULL,'N')
+         INTO :V_DS_MENSAGEM;
+         IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+            SUSPEND;
+            EXIT;
+         END
+
+         --[ Agrupa os LanÁamentos de Contas Cont·beis Repetidas em um Novo LanÁamento ]--
+         IF (V_ST_CONTABILIZAAGRUPADO = 'S') THEN BEGIN
+            SELECT O_DS_MENSAGEM
+            FROM LANCAMENTO_COMPOSTO(:V_CD_EMPRESA,:V_NR_LANCAMENTO,:V_CD_SERIE,:V_TP_NOTA)
+            INTO :V_DS_MENSAGEM;
+            IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+               SUSPEND;
+               EXIT;
+            END
+         END
+
+      END
+      --[ BUSCA TODOS OS CUPOM FISCAL DO PERÕODO E APAGA OS MOVIMENTOS CONT¡BEIS ]--
+      FOR SELECT DISTINCT C.DT_EMISSAO, C.NR_SERIE, C.NR_EQUIPAMENTO, C.TP_TRIBUTACAO, C.CD_EMPRMOVTOCONTABIL, C.NR_LANCTOMOVTOCONTABIL
+          FROM   CUPOMFISCAL C
+          WHERE  C.CD_EMPRESA = :I_CD_EMPRESA
+          AND    C.DT_EMISSAO BETWEEN :I_DT_INICIAL AND :I_DT_FINAL
+          AND    C.CD_EMPRMOVTOCONTABIL   IS NOT NULL
+          AND    C.NR_LANCTOMOVTOCONTABIL IS NOT NULL
+          INTO   :V_DT_EMISSAO, :V_NR_SERIE, :V_NR_EQUIPAMENTO, :V_TP_TRIBUTACAO, :V_CD_EMPRMOVTOCONTABIL, :V_NR_LANCTOMOVTOCONTABIL
+      DO BEGIN
+         --[ APAGA A REFERENCIA DO LAN«AMENTO ]--
+         UPDATE CUPOMFISCAL C
+         SET    C.CD_EMPRMOVTOCONTABIL   = NULL,
+                C.NR_LANCTOMOVTOCONTABIL = NULL
+         WHERE  C.CD_EMPRESA = :I_CD_EMPRESA
+         AND    C.DT_EMISSAO = :V_DT_EMISSAO
+         AND    C.NR_SERIE   = :V_NR_SERIE
+         AND    C.NR_EQUIPAMENTO = :V_NR_EQUIPAMENTO
+         AND    C.TP_TRIBUTACAO  = :V_TP_TRIBUTACAO;
+         --[ APAGA O MOVIMENTO CONT¡ÅBIL DO CUPOM FISCAL ]--
+         DELETE FROM  MOVTOCONTABIL M
+         WHERE M.CD_EMPRESA    = :V_CD_EMPRMOVTOCONTABIL
+         AND   M.NR_LANCAMENTO = :V_NR_LANCTOMOVTOCONTABIL;
+      END
+      --[ GERA NOVAMENTE A CONTABILIZA«√O DOS LAN«AMENTOS ]--
+      IF ( V_ST_CUPOMFISCAL = 'S' ) THEN BEGIN
+         FOR SELECT DISTINCT C.DT_EMISSAO, C.NR_SERIE, C.NR_EQUIPAMENTO, C.CD_EMPRMOVTOCONTABIL, C.NR_LANCTOMOVTOCONTABIL
+             FROM   CUPOMFISCAL C
+             WHERE  C.CD_EMPRESA = :I_CD_EMPRESA
+             AND    C.DT_EMISSAO BETWEEN :I_DT_INICIAL AND :I_DT_FINAL
+             INTO   :V_DT_EMISSAO, :V_NR_SERIE, :V_NR_EQUIPAMENTO, :V_CD_EMPRMOVTOCONTABIL, :V_NR_LANCTOMOVTOCONTABIL
+         DO BEGIN
+            --[ GERA A CONTABILIZA«√O ]--
+            SELECT V.O_DS_MENSAGEM
+            FROM   CONTABILIZA_CUPOMFISCAL(:I_CD_EMPRESA, :V_DT_EMISSAO, :V_NR_SERIE, :V_NR_EQUIPAMENTO) V
+            INTO   :V_DS_MENSAGEM;
+            --[ CASO OCORRA ALGUM ERRO ]--
+            IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+               V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||:V_DS_MENSAGEM;
+               SUSPEND;
+               EXIT;
+            END
+         END
+      END
+      --[ BUSCA TODAS AS NF QUE FORAM LAN«ADAS PELO FATURAMENTO ]--
+      V_DS_CONSULTA =
+         'SELECT N.CD_EMPRESA, N.NR_LANCAMENTO, N.TP_NOTA, P.NM_PESSOA, P.NR_CNPJCPF, E.NR_INSCEST, '||
+         '   E.DS_ENDERECO, M.DS_MUNICIPIO, M.SG_ESTADO, C.DS_CONDPAGTO, F.DS_FORMAPAGTO, '||
+         '   COALESCE(COALESCE(N.NR_NOTAFISCAL, N.NR_NOTAFOR),0), '||
+         '   CASE WHEN N.NR_NOTAFISCAL IS NULL THEN ''N'' ELSE ''S'' END, '||
+         '   CASE WHEN N.NR_NOTAFISCAL IS NOT NULL THEN N.CD_ESPECIE ELSE COALESCE(N.CD_ESPECIEFOR,N.CD_ESPECIE) END, '||
+         '   N.ST_NOTA, N.NR_CUPOMFISCAL, N.DT_EMISSAO, N.TP_PAGTOFRETE, N.PS_BRUTO, N.PS_LIQUIDO, '||
+         '   N.QT_VOLUME, N.VL_DESCONTO, N.VL_FRETE, N.VL_DESPESA, N.VL_CONTABIL, N.VL_NOTAFISCAL, '||
+         '   CASE WHEN N.NR_NOTAFISCAL IS NOT NULL THEN N.CD_SERIE ELSE COALESCE(N.CD_SERIEFOR,N.CD_SERIE) END, '||
+         '   P.CD_PESSOA, C.ST_CONDPAGTO, M.CD_DFC, N.CD_SERIE, N.DT_FORNECEDOR, N.VL_JUROVENDA, '||
+         '   NFE.CSTAT, NFE.NR_CHAVEACESSO, N.CD_REMETENTE, N.CD_CONSIGNATARIO, N.NR_SERIEEQUIPAMENTOECF, N.DS_OBSNOTA, N.DS_OBSFISCAL '||
+         'FROM NOTA N '||
+         'INNER JOIN ENDERECOPESSOA E ON (N.CD_PESSOA = E.CD_PESSOA '||
+         '                            AND N.CD_ENDERECO = E.CD_ENDERECO) '||
+         'INNER JOIN PESSOA P ON (P.CD_PESSOA = E.CD_PESSOA) '||
+         'INNER JOIN MUNICIPIO M ON (M.CD_MUNICIPIO = E.CD_MUNICIPIO) '||
+         'INNER JOIN CONDPAGTO C ON (C.CD_CONDPAGTO = N.CD_CONDPAGTO) '||
+         'INNER JOIN FORMAPAGTO F ON (F.CD_FORMAPAGTO = N.CD_FORMAPAGTO) '||
+         'LEFT JOIN NFE ON (NFE.CD_EMPRESA = N.CD_EMPRESA '||
+         '              AND NFE.NR_LANCAMENTO = N.NR_LANCAMENTO '||
+         '              AND NFE.CD_SERIE = N.CD_SERIE '||
+         '              AND NFE.TP_NOTA = N.TP_NOTA) '||
+         'WHERE N.CD_EMPRESA = '||I_CD_EMPRESA||COALESCE(V_DS_WHERE,'')||
+         '  AND N.ST_NOTA IN (''V'',''C'',''E'') '||
+         '  AND N.VL_NOTAFISCAL IS NOT NULL ';
+      IF ( V_ST_CUPOMFISCAL = 'S' ) THEN
+         V_DS_CONSULTA = V_DS_CONSULTA ||'  AND N.NR_CUPOMFISCAL IS NULL ';
+      FOR
+         EXECUTE STATEMENT :V_DS_CONSULTA
+         INTO :V_CD_EMPRESA,:V_NR_LANCAMENTO,:V_TP_NOTA,:V_NM_PESSOA,:V_NR_CNPJCPF,:V_NR_INSCEST,
+              :V_DS_ENDERECO,:V_DS_MUNICIPIO,:V_SG_ESTADO,:V_DS_CONDPAGTO,:V_DS_FORMAPAGTO,:V_NR_NOTAFISCAL, :V_ST_EMISSAOPROPRIA,
+              :V_CD_ESPECIE,:V_ST_NOTA,:V_NR_CUPOMFISCAL,:V_DT_EMISSAO,:V_TP_PAGTOFRETE,:V_PS_BRUTO,:V_PS_LIQUIDO,
+              :V_QT_VOLUME,:V_VL_DESCONTO,:V_VL_FRETE,:V_VL_DESPESA,:V_VL_CONTABIL,:V_VL_NOTAFISCAL,
+              :V_CD_SERIE, :V_CD_PESSOA, :V_ST_CONDPAGTO, :V_CD_DFC, :V_CD_SERIENF,
+              :V_DT_FORNECEDOR, :V_VL_JURO, :V_CSTAT, :V_NR_CHAVEACESSO, :V_CD_REMETENTE, :V_CD_CONSIGNATARIO, :V_NR_SERIE, :V_DS_OBSNOTA, :V_DS_OBSFISCALNOTA
+      DO BEGIN
+         -- SE FOR CTRC VERIFICA PAGADOR DO FRETE
+         IF ( V_CD_REMETENTE IS NOT NULL ) THEN BEGIN
+            IF ( V_TP_PAGTOFRETE = '1' ) THEN
+               V_CD_PESSOA = V_CD_REMETENTE;
+            ELSE IF ( V_TP_PAGTOFRETE = '3' ) THEN
+               V_CD_PESSOA = V_CD_CONSIGNATARIO;
+         END
+
+         V_CD_CONTACLI = Null;  V_CD_CONTAFOR = Null;
+         -- BUSCA CONTAS CONTAB…IS DA PESSOA
+         SELECT FIRST 1 CP.CD_CONTACLI, CP.CD_CONTAFOR
+         FROM CONTASPESSOA CP
+         WHERE CP.CD_EMPRESA = :V_CD_EMPRESA
+           AND CP.CD_PESSOA = :V_CD_PESSOA
+         ORDER BY CP.CD_CONTACLI
+         INTO :V_CD_CONTACLI, :V_CD_CONTAFOR;
+
+         V_NR_NOTAFISCAL = COALESCE(V_NR_NOTAFISCAL,0);
+         --[ INTEGRA AS NOTAS FISCAIS ]--
+         SELECT M.ST_FISCAL
+         FROM MODELONF M
+         WHERE M.CD_SERIE   = :V_CD_SERIE
+           AND M.CD_ESPECIE = :V_CD_ESPECIE
+         INTO :V_ST_FISCAL;
+         IF (((V_TP_NOTA = 'S') AND (V_ST_FISCAL IN ('T','S'))) OR ((V_TP_NOTA = 'E') AND (V_ST_FISCAL IN ('T','E')))) THEN
+            V_ST_FISCAL = 'S';
+         ELSE
+            V_ST_FISCAL = 'N';
+         --[ VALIDA O CNPJ OU CPF ]--
+         IF ((:V_ST_FISCAL = 'S') AND (:V_TP_CONTABILIZACAO = 'V') AND (:V_SG_ESTADO <> 'EX') AND (:V_ST_NOTA IN ('V','C')) ) THEN BEGIN
+            IF ((:V_NR_CNPJCPF = '000.000.000-00') OR (:V_NR_CNPJCPF = '00.000.000/0000-00')) THEN BEGIN
+               V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A PESSOA "'||:V_NM_PESSOA||'" EST¡Å COM CPF OU CNPJ INV¡ÅLIDO [TFA001]!';
+               SUSPEND;
+               EXIT;
+            END
+         END
+         --[ SE TEM JURO BUSCA A CONTA DE JUROS ]--
+         V_CD_CONTAJURO = NULL;
+         V_CD_HISTJURO = NULL;
+         IF ((:V_VL_JURO IS NOT NULL) AND (:V_VL_JURO > 0)) THEN
+         BEGIN
+            SELECT SUM(COALESCE(NI.VL_JUROVENDA,0))
+             FROM ITEMNOTA NI
+             INNER JOIN MOVIMENTACAO M ON (M.CD_MOVIMENTACAO = NI.CD_MOVIMENTACAO)
+             WHERE CD_EMPRESA    = :V_CD_EMPRESA
+               AND NR_LANCAMENTO = :V_NR_LANCAMENTO
+               AND CD_SERIE      = :V_CD_SERIENF
+               AND TP_NOTA       = :V_TP_NOTA
+               AND M.CD_HISTDESPESA IS NOT NULL
+             INTO :V_VL_JUROVENDA;
+
+             -- [ JuroVenda da nota > JuroVenda dos Itens com histrico de Juros/Despesas
+             IF (V_VL_JURO > COALESCE(V_VL_JUROVENDA,0)) THEN
+             BEGIN
+                SELECT H.CD_CONTACREDITO, P.CD_HISTJUROFINANC
+                FROM PARMFINANC P
+                INNER JOIN HISTORICO H ON (H.CD_HISTORICO = P.CD_HISTJUROFINANC)
+                WHERE P.CD_EMPRESA = :V_CD_EMPRESA
+                INTO :V_CD_CONTAJURO, :V_CD_HISTJURO;
+
+                IF (:V_CD_HISTJURO IS NULL) THEN BEGIN
+                   V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'HIST”RICO DE FINANCIAMENTO DEVE SER INFORMADO [FNC001]!';
+                   SUSPEND;
+                   EXIT;
+                END
+                IF (:V_CD_CONTAJURO IS NULL) THEN BEGIN
+                   V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A CONTA DE JURO DO HIST”RICO DE FINANCIAMENTO DEVE SER INFORMADA [FNC001]!';
+                   SUSPEND;
+                   EXIT;
+                END
+             END
+         END
+
+         SELECT MAX(M.ST_SPEDCONTRIBUICAO)
+         FROM ITEMNOTA NI
+         INNER JOIN MOVIMENTACAO M ON (M.CD_MOVIMENTACAO = NI.CD_MOVIMENTACAO)
+         WHERE CD_EMPRESA    = :V_CD_EMPRESA
+           AND NR_LANCAMENTO = :V_NR_LANCAMENTO
+           AND CD_SERIE      = :V_CD_SERIENF
+           AND TP_NOTA       = :V_TP_NOTA
+         INTO :V_ST_SPEDCONTRIBUICAO;
+         V_ST_SPEDCONTRIBUICAO = COALESCE(V_ST_SPEDCONTRIBUICAO,'N');
+
+         -- DELETA OS MOVIMENTOS ANTIGOS
+         DELETE FROM IMPOSTONOTACTB
+         WHERE  CD_EMPRESA    = :V_CD_EMPRESA
+           AND  NR_LANCAMENTO = :V_NR_LANCAMENTO
+           AND  TP_NOTA       = :V_TP_NOTA;
+
+         DELETE FROM ITEMNOTACTB
+         WHERE  CD_EMPRESA    = :V_CD_EMPRESA
+           AND  NR_LANCAMENTO = :V_NR_LANCAMENTO
+           AND  TP_NOTA       = :V_TP_NOTA;
+
+         DELETE FROM CONTASCTB
+         WHERE  CD_EMPRESA    = :V_CD_EMPRESA
+           AND  NR_LANCTONOTA = :V_NR_LANCAMENTO
+           AND  TP_CONTAS     = :V_TP_NOTA;
+
+         DELETE FROM MOVTOCONTABIL
+         WHERE  CD_EMPRNF    = :I_CD_EMPRESA
+           AND  NR_LANCTONF  = :I_NR_LANCAMENTO
+           AND  TP_NOTANF    = :I_TP_NOTA;
+
+         DELETE FROM DEVOLUCAO
+         where CD_EMPRNF   = :V_CD_EMPRESA
+           AND NR_LANCTONF = :V_NR_LANCAMENTO
+           AND TP_NOTANF   = :V_TP_NOTA;
+
+         DELETE FROM NOTACTB
+         WHERE  CD_EMPRESA    = :V_CD_EMPRESA
+           AND  NR_LANCAMENTO = :V_NR_LANCAMENTO
+           AND  TP_NOTA       = :V_TP_NOTA;
+
+         INSERT INTO NOTACTB (CD_EMPRESA, NR_LANCAMENTO, CD_SERIE, TP_NOTA, NM_PESSOA, NR_CNPJCPF, NR_INSCEST,
+                              DS_ENDERECO, DS_MUNICIPIO, SG_ESTADO, DS_CONDPAGTO, DS_FORMAPAGTO, NR_NOTAFISCAL, ST_EMISSAOPROPRIA,
+                              CD_ESPECIE, ST_NOTA, ST_FISCAL, NR_CUPOMFISCAL, DT_EMISSAO, TP_PAGTOFRETE, PS_BRUTO, PS_LIQUIDO,
+                              QT_VOLUME, VL_DESCONTO, VL_FRETE, VL_DESPESA, VL_CONTABIL, VL_NOTAFISCAL, CD_CONTADESPESA,
+                              TP_LANCAMENTO, ST_CONDPAGTO, CD_DFC, DT_SAIDANF, CD_USUARIO, VL_JURO, CD_CONTAJURO, CD_HISTJURO, ST_CSTATNFE,
+                              NR_CHAVEACESSONFE, ST_SPEDCONTRIBUICAO, NR_SERIEEQUIPAMENTOECF, CD_PESSOA, DS_OBSNOTA, DS_OBSFISCAL, DT_REGISTRO)
+                     VALUES (:V_CD_EMPRESA, :V_NR_LANCAMENTO, :V_CD_SERIE, :V_TP_NOTA, :V_NM_PESSOA, :V_NR_CNPJCPF, :V_NR_INSCEST,
+                             :V_DS_ENDERECO, :V_DS_MUNICIPIO, :V_SG_ESTADO, :V_DS_CONDPAGTO, :V_DS_FORMAPAGTO, :V_NR_NOTAFISCAL, :V_ST_EMISSAOPROPRIA,
+                             :V_CD_ESPECIE, :V_ST_NOTA, :V_ST_FISCAL, :V_NR_CUPOMFISCAL, :V_DT_EMISSAO, :V_TP_PAGTOFRETE, :V_PS_BRUTO,
+                             :V_PS_LIQUIDO, :V_QT_VOLUME, :V_VL_DESCONTO,
+                             CASE WHEN (:V_VL_FRETE) < 0 THEN 0.00 ELSE :V_VL_FRETE END,
+                             :V_VL_DESPESA, :V_VL_CONTABIL, :V_VL_NOTAFISCAL,
+                             CASE WHEN :V_TP_NOTA = 'E' THEN :V_CD_CONTADESPESAE ELSE :V_CD_CONTADESPESAS END,
+                             'N', :V_ST_CONDPAGTO, :V_CD_DFC, :V_DT_FORNECEDOR,
+                             :V_CD_USUARIO, CASE WHEN (:V_VL_JURO) < 0 THEN 0.00 ELSE :V_VL_JURO END, :V_CD_CONTAJURO, :V_CD_HISTJURO,
+                             :V_CSTAT, :V_NR_CHAVEACESSO, :V_ST_SPEDCONTRIBUICAO, :V_NR_SERIE, :V_CD_PESSOA, :V_DS_OBSNOTA, :V_DS_OBSFISCALNOTA, 'NOW');
+
+         --[ TIPO = V - UMA CONTA PARA CADA CLIENTE E FORNEC.]--
+         IF (V_TP_CONTABILIZACAO = 'V') THEN BEGIN
+            --[ CRIA UMA CONTA PARA CLIENTE E UMA PARA FORNEC. ]--
+            IF (V_CD_CONTACLI IS NULL) THEN BEGIN
+               EXECUTE PROCEDURE GERA_CONTACLIFOR (:I_CD_EMPRESA,:V_CD_CONTAPAICLI,:V_CD_CONTAPAIFOR,
+                                                   :V_DS_MASCARA,:V_CD_PESSOA,:V_NR_CNPJCPF,:V_NM_PESSOA)
+               RETURNING_VALUES (V_DS_MENSAGEM,V_CD_CONTACLI,V_CD_CONTAFOR);
+               IF (V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+                  V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||V_DS_MENSAGEM;
+                  SUSPEND;
+                  EXIT;
+               END
+            END
+         END
+         --[ INTEGRA OS ITENS DAS NF ]--
+         V_SQ_ITEM = 0;
+         FOR
+            SELECT I.CD_ITEM, I.CD_MOVIMENTACAO, I.CD_CFO, I.CD_CST, I.CD_ORIGEM, I.CD_OBSFISCAL, SUBSTRING(O.DS_OBSFISCAL FROM 1 FOR 240), I.PS_ITEMNOTA, I.QT_ITEMNOTA,
+               I.VL_UNITARIO, I.VL_TOTAL, I.VL_DESCONTO, I.VL_FRETE, I.VL_DESPESA, I.PC_ICMS, H.DS_HISTORICO,
+               I.PC_IPI, M.ST_CONTABIL, M.ST_DEVOLUCAO, H.CD_CONTADEBITO, H.CD_CONTACREDITO, T.NR_NCM,
+               T.DS_ITEM, T.SG_UNIDMED, I.VL_LIQUIDO, I.VL_JUROVENDA, M.CD_OPERACAO, T.TP_ITEM, M.CD_TIPOCONTA,
+               I.VL_CUSTO, M.CD_HISTESTOQUE, DS_SERVICO, M.CD_HISTCOMISSAO, I.VL_COMISSAO, M.CD_HISTDESPESA, M.CD_HISTORICO, I.CD_CSOSN
+             FROM ITEMNOTA I
+             INNER JOIN MOVIMENTACAO M ON (M.CD_MOVIMENTACAO = I.CD_MOVIMENTACAO)
+             INNER JOIN OBSFISCAL O ON (O.CD_OBSFISCAL = M.CD_OBSFISCAL)
+             INNER JOIN HISTORICO H ON (H.CD_HISTORICO = M.CD_HISTORICO)
+             INNER JOIN ITEM T ON (T.CD_ITEM = I.CD_ITEM)
+             WHERE CD_EMPRESA    = :V_CD_EMPRESA
+               AND NR_LANCAMENTO = :V_NR_LANCAMENTO
+               AND CD_SERIE      = :V_CD_SERIENF
+               AND TP_NOTA       = :V_TP_NOTA
+             INTO :V_CD_ITEM, :V_CD_MOVIMENTACAO, :V_CD_CFO, :V_CD_CST, :V_CD_ORIGEM, :V_CD_OBSFISCAL, :V_DS_OBSFISCALITEM, :V_PS_ITEMNOTA,  :V_QT_ITEMNOTA,
+                  :V_VL_UNITARIO, :V_VL_TOTAL, :V_VL_DESCITEM, :V_VL_FRETEITEM, :V_VL_DESPITEM, :V_PC_ICMS, :V_DS_HISTORICO,
+                  :V_PC_IPI,  :V_ST_CONTABIL, :V_ST_DEVOLUCAO, :V_CD_CONTADEBITO, :V_CD_CONTACREDITO, :V_NR_NCM,
+                  :V_DS_ITEM, :V_SG_UNIDMED, :V_VL_LIQUIDO, :V_VL_JUROVENDA, :V_CD_OPERACAO, :V_TP_ITEM, :V_CD_TIPOCONTA,
+                  :V_VL_CUSTO, :V_CD_HISTESTOQUE, :V_DS_SERVICO, :V_CD_HISTCOMISSAO, :V_VL_COMISSAO, :V_CD_HISTDESPESA, :V_CD_HISTORICO,
+                  :V_CD_CSOSN
+         DO BEGIN
+            -- HISTORICO DE ESTOQUE
+            V_CD_CONTADEBEST  = NULL;
+            V_CD_CONTACREDEST = NULL;
+            V_DS_HISTESTOQUE  = NULL;
+            IF ( V_CD_HISTESTOQUE IS NOT NULL ) THEN
+               SELECT HE.CD_CONTADEBITO, HE.CD_CONTACREDITO, HE.DS_HISTORICO
+               FROM HISTORICO HE
+               WHERE HE.CD_HISTORICO = :V_CD_HISTESTOQUE
+               INTO   :V_CD_CONTADEBEST, :V_CD_CONTACREDEST, :V_DS_HISTESTOQUE;
+            IF (((:V_CD_CONTADEBEST IS NOT NULL) AND (:V_CD_CONTACREDEST IS NULL)) OR
+               ((:V_CD_CONTADEBEST IS NULL) AND (:V_CD_CONTACREDEST IS NOT NULL))) THEN BEGIN
+               V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'UMA DAS CONTAS DO HIST”RICO DE ESTOQUE "'||:V_DS_HISTESTOQUE||'" N√O FOI INFORMADA [TCB003]!';
+               SUSPEND;
+               EXIT;
+            END
+            --[ VALIDA AS CONTAS CONT¡BEIS P/ N√O PASSAR CONTAS NULAS ]--
+            IF (V_TP_NOTA = 'E') THEN BEGIN
+               --[ ATRIBUI A CONTA DE FORNEC P/ CONTA DE CR…DITO ]--
+               IF (V_CD_CONTACREDITO IS NULL) THEN
+                  V_CD_CONTACREDITO = V_CD_CONTAFOR;
+               IF (V_CD_CONTADEBITO IS NULL) THEN BEGIN
+                  V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A CONTA DE D…BITO DO HIST”TICO DE ENTRADA "'||:V_DS_HISTORICO||'" N√O FOI INFORMADA [TCB003]!';
+                  SUSPEND;
+                  EXIT;
+               END
+            END 
+         ELSE 
+         IF (V_TP_NOTA = 'S') THEN BEGIN
+               --[ ATRIBUI A CONTA DE CLIENTES P/ CONTA DE D…BITO ]--
+               IF (V_CD_CONTADEBITO IS NULL) THEN
+                  V_CD_CONTADEBITO = V_CD_CONTACLI;
+               IF (V_CD_CONTACREDITO IS NULL) THEN BEGIN
+                  V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A CONTA DE CR…DITO DO HIST”RICO DE SAÕçDA "'||:V_DS_HISTORICO||'" N√O FOI INFORMADA [TCB003]!';
+                  SUSPEND;
+                  EXIT;
+               END
+            END
+            --[ ATUALIZA A CONTA DE D…BITO OU CREITO ]--
+            IF (V_TP_CONTABILIZACAO = 'V') THEN BEGIN
+               --[ SE A CONTA DE D…BITO OU CR…DITO S√O CONTA DE CLIENTES ]--
+               IF (V_CD_CONTADEBITO  = V_CD_CONTAPAICLI) THEN
+                  V_CD_CONTADEBITO   = V_CD_CONTACLI;
+               IF (V_CD_CONTACREDITO = V_CD_CONTAPAICLI) THEN
+                  V_CD_CONTACREDITO  = V_CD_CONTACLI;
+               --[ SE A CONTA DE D…BITO OU CR…DITO S√O A CONTA DE FORNECEDORES ]--
+               IF (V_CD_CONTADEBITO  = V_CD_CONTAPAIFOR) THEN
+                  V_CD_CONTADEBITO   = V_CD_CONTAFOR;
+               IF (V_CD_CONTACREDITO = V_CD_CONTAPAIFOR) THEN
+                  V_CD_CONTACREDITO  = V_CD_CONTAFOR;
+            END
+            --[ SE N√OO TEM CUSTO GRAVADO NA NF BUSCA O CUSTO DO ESTOQUE ]--
+            IF ((:V_VL_CUSTO IS NULL) AND (:V_CD_OPERACAO IS NOT NULL)) THEN
+               --[ BUSCA O CUSTO DO ITEM DA NOTA ]--
+               SELECT ABS(SUM(M.VL_ESTOQUE))
+               FROM MOVESTOQUE M
+               WHERE M.CD_EMPRORIGEM = :V_CD_EMPRESA
+                 AND M.NR_LANCTONOTA = :V_NR_LANCAMENTO
+                 AND M.CD_SERIE      = :V_CD_SERIENF
+                 AND M.TP_NOTA       = :V_TP_NOTA
+                 AND M.CD_ITEM       = :V_CD_ITEM
+                 AND M.CD_OPERACAO   = :V_CD_OPERACAO
+               INTO :V_VL_CUSTO;
+            IF(V_ST_VARIOSVENDEDORES = 'S' )THEN
+            BEGIN
+               SELECT
+                  SUM(COALESCE(M.VL_COMISSAO,0))
+               FROM ITEMNOTAVENDEDOR M
+               WHERE M.CD_EMPRESA    = :V_CD_EMPRESA
+                 AND M.NR_LANCAMENTO = :V_NR_LANCAMENTO
+                 AND M.CD_SERIE      = :V_CD_SERIENF
+                 AND M.TP_NOTA       = :V_TP_NOTA
+                 AND M.CD_ITEM       = :V_CD_ITEM
+               INTO :V_VL_COMISSAO;
+            END
+            --[ GRAVA A TABELA DE ITEMNOTACTB ]--
+            V_SQ_ITEM = V_SQ_ITEM + 1;
+            INSERT INTO ITEMNOTACTB (CD_EMPRESA,NR_LANCAMENTO,CD_SERIE,TP_NOTA,SQ_ITEM,CD_ITEM,CD_MOVIMENTACAO,CD_CFO,CD_CST,CD_ORIGEM,
+                                     CD_OBSFISCAL, DS_OBSFISCAL,PS_ITEMNOTA,QT_ITEMNOTA,VL_UNITARIO,VL_TOTAL,VL_DESCONTO,VL_JUROVENDA,
+                                     VL_FRETE,VL_DESPESA,PC_ICMS,PC_IPI,ST_CONTABIL,ST_DEVOLUCAO,CD_CONTADEBITO,CD_CONTACREDITO,
+                                     CD_CONTADEBEST,CD_CONTACREDEST,DS_HISTORICO,NR_NCM,DS_ITEM,SG_UNIDMED,VL_LIQUIDO,VL_CUSTO,
+                                     TP_ITEM,DT_REGISTRO,DS_SERVICO,CD_HISTCOMISSAO,CD_HISTDESPESA,VL_COMISSAO, CD_HISTORICO, CD_HISTORICOEST, CD_CSOSN)
+                             VALUES (:V_CD_EMPRESA,:V_NR_LANCAMENTO,:V_CD_SERIE,:V_TP_NOTA,:V_SQ_ITEM,:V_CD_ITEM,:V_CD_MOVIMENTACAO,:V_CD_CFO,:V_CD_CST,:V_CD_ORIGEM,
+                                     :V_CD_OBSFISCAL,:V_DS_OBSFISCALITEM,:V_PS_ITEMNOTA,:V_QT_ITEMNOTA,:V_VL_UNITARIO,:V_VL_TOTAL,:V_VL_DESCITEM,
+                                     CASE WHEN (:V_VL_JUROVENDA) < 0 THEN 0.00 ELSE :V_VL_JUROVENDA END,
+                                     CASE WHEN (:V_VL_FRETEITEM) < 0 THEN 0.00 ELSE :V_VL_FRETEITEM END
+                                     ,:V_VL_DESPITEM,:V_PC_ICMS,:V_PC_IPI,:V_ST_CONTABIL,:V_ST_DEVOLUCAO,:V_CD_CONTADEBITO,:V_CD_CONTACREDITO,
+                                     :V_CD_CONTADEBEST,:V_CD_CONTACREDEST,:V_DS_HISTORICO,:V_NR_NCM,:V_DS_ITEM,:V_SG_UNIDMED,COALESCE(:V_VL_LIQUIDO,0),
+                                     COALESCE(:V_VL_CUSTO,0),:V_TP_ITEM,'NOW',:V_DS_SERVICO,:V_CD_HISTCOMISSAO,:V_CD_HISTDESPESA,:V_VL_COMISSAO, :V_CD_HISTORICO, :V_CD_HISTESTOQUE,
+                                     :V_CD_CSOSN);
+            --[ VALIDA SE O HIST”RICO EST¡ COM AS CONTAS CONT¡BEIS CORRETAS PARA A MOVIMENTA«√O ]--
+            IF ((:V_CD_TIPOCONTA IS NULL) AND (:V_ST_CONTABIL = 'S')) THEN BEGIN
+               IF ((:V_CD_CONTADEBITO  = :V_CD_CONTAPAICLI) OR (:V_CD_CONTADEBITO = :V_CD_CONTACLI)) THEN
+                  V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A CONTA D…BITO N√O PODE SER "CLIENTE" PORQUE A MOVIMENTA«√O "'||:V_CD_MOVIMENTACAO||'" N√O GERA FINANCEIRO ! [TCB001]';
+               IF ((:V_CD_CONTACREDITO = :V_CD_CONTAPAIFOR) OR (:V_CD_CONTACREDITO = :V_CD_CONTAFOR)) THEN
+                  V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'A CONTA CR…DITO N√O PODE SER "FORNECEDOR" PORQUE A MOVIMENTA«√O "'||:V_CD_MOVIMENTACAO||'" N√O GERA FINANCEIRO ! [TCB001]';
+            END
+            IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+               SUSPEND; EXIT;
+            END
+            --[ INTEGRA O IMPOSTO DE CADA ITEM DA NOTA FISCAL ]--
+            SELECT O_DS_MENSAGEM
+            FROM GERA_INTEGRACAOIMPOSTO(:V_CD_EMPRESA, :V_NR_LANCAMENTO, :V_CD_SERIE, :V_CD_SERIENF, :V_TP_NOTA, :V_CD_ITEM, :V_SQ_ITEM,
+                                        :V_CD_MOVIMENTACAO, :V_NR_NOTAFISCAL, :V_CD_PESSOA, :V_NR_CNPJCPF, :V_NM_PESSOA, :V_VL_LIQUIDO)
+            INTO :V_DS_MENSAGEM;
+            IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+               SUSPEND;
+               EXIT;
+            END
+         END
+         --[ GERA OS MOVIMENTOS CONT¡ÅBEIS DA NF ]--
+         EXECUTE PROCEDURE GERA_MOVTOCONTABIL(:V_CD_EMPRESA,:V_NR_LANCAMENTO,:V_CD_SERIE,:V_TP_NOTA,NULL,'N')
+         RETURNING_VALUES (:V_DS_MENSAGEM);
+         IF ( V_DS_MENSAGEM IS NOT NULL ) THEN BEGIN
+            V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||V_DS_MENSAGEM;
+            SUSPEND;
+            EXIT;
+         END
+
+         IF (V_ST_CONTABILIZAAGRUPADO = 'S') THEN BEGIN
+            SELECT O_DS_MENSAGEM
+            FROM LANCAMENTO_COMPOSTO(:V_CD_EMPRESA,:V_NR_LANCAMENTO,:V_CD_SERIE,:V_TP_NOTA)
+            INTO :V_DS_MENSAGEM;
+            IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+               SUSPEND;
+               EXIT;
+            END
+         END
+
+         V_DS_CONSULTA_CON =
+            ' SELECT C.NR_LANCAMENTO, T.TP_TIPOCONTA, C.NR_PARCELA, P.NM_PESSOA, P.NR_CNPJCPF, C.CD_FORMAPAGTO, '||
+            '        C.NR_DOCUMENTO, C.DT_LANCAMENTO, C.DT_VENCIMENTO, C.VL_DOCUMENTO, C.VL_SALDO, '||
+            '        C.ST_CONTAS, '||V_DS_DUPLICATA||' DS_COMPLEMENTO, '||
+            ' F.DS_FORMAPAGTO, C.CD_PESSOA '||
+            ' FROM CONTAS C '||
+            ' INNER JOIN TIPOCONTA  T ON (T.CD_TIPOCONTA  = C.CD_TIPOCONTA) '||
+            ' INNER JOIN PESSOA     P ON (P.CD_PESSOA     = C.CD_PESSOA) '||
+            ' INNER JOIN NOTA       N ON (N.CD_EMPRESA    = C.CD_EMPRESA    '||
+            '                         AND N.NR_LANCAMENTO = C.NR_LANCTONOTA '||
+            '                         AND N.CD_SERIE      = C.CD_SERIE      '||
+            '                         AND N.TP_NOTA       = C.TP_CONTAS)    '||
+            ' LEFT JOIN FORMAPAGTO F ON (F.CD_FORMAPAGTO = C.CD_FORMAPAGTO) '||
+            ' WHERE C.CD_EMPRESA    = '||I_CD_EMPRESA||
+            '   AND C.NR_LANCTONOTA = '||V_NR_LANCAMENTO||
+            '   AND C.TP_CONTAS     = '''||trim(V_TP_NOTA)||''''||
+            '   AND C.CD_SERIE      = '''||trim(V_CD_SERIENF)||''''||
+            '   AND C.TP_DOCUMENTO <> ''DP'' ';
+
+
+         FOR
+            EXECUTE STATEMENT :V_DS_CONSULTA_CON
+            INTO   :V_NR_LANCCONTAS, :V_TP_TIPOCONTA, :V_NR_PARCELA, :V_NM_PESSOACONTAS, :V_NR_CNPJCPF, :V_CD_FORMAPAGTO,
+                   :V_NR_DOCUMENTO, :V_DT_LANCAMENTO, :V_DT_VENCIMENTO, :V_VL_DOCUMENTO, :V_VL_SALDO,
+                   :V_ST_CONTAS, :V_DS_COMPLEMENTO, :V_DS_FORMAPAGTOCONTAS, :V_CD_PESSOACONTA
+         DO BEGIN
+   
+            INSERT INTO CONTASCTB(NR_LANCTONOTA,CD_SERIE,TP_CONTAS,CD_EMPRESA,NR_LANCAMENTO, TP_TIPOCONTA,
+                                  NR_PARCELA, NM_PESSOA, DS_FORMAPAGTO,NR_DOCUMENTO, DT_LANCAMENTO, DT_VENCIMENTO,
+                                  VL_DOCUMENTO, VL_SALDO,ST_CONTAS,DS_COMPLEMENTO,NR_CNPJCPF,ST_CONTABIL,DT_REGISTRO,
+                                  CD_PESSOA)
+                           VALUES(:V_NR_LANCAMENTO,:V_CD_SERIE,:V_TP_NOTA,:I_CD_EMPRESA,
+                                  :V_NR_LANCCONTAS, :V_TP_TIPOCONTA, :V_NR_PARCELA, :V_NM_PESSOACONTAS,
+                                  :V_DS_FORMAPAGTOCONTAS,:V_NR_DOCUMENTO, :V_DT_LANCAMENTO, :V_DT_VENCIMENTO,
+                                  :V_VL_DOCUMENTO, :V_VL_SALDO,:V_ST_CONTAS,:V_DS_COMPLEMENTO,:V_NR_CNPJCPF,'N','NOW',
+                                  :V_CD_PESSOACONTA);
+         END
+
+      END
+   END
+   IF ( I_TP_INTEGRACAO NOT IN ('N','E','S','C','F') ) THEN
+   BEGIN
+      -- N⁄MERO DO PROCESSO
+      IF ((I_NR_NOTAFISCAL IS NOT NULL) AND (I_NR_LANCAMENTO IS NOT NULL)) THEN
+         V_DS_WHERECAIXA = ' AND X.CD_EMPRPROC = '||:I_CD_EMPRESA||' AND X.NR_PROCESSO = '||:I_NR_NOTAFISCAL
+                         ||' AND X.NR_LANCCAIXA = '||:I_NR_LANCAMENTO;
+      ELSE IF (I_NR_NOTAFISCAL IS NOT NULL) THEN
+         V_DS_WHERECAIXA = ' AND X.CD_EMPRPROC = '||:I_CD_EMPRESA||' AND X.NR_PROCESSO = '||:I_NR_NOTAFISCAL;
+      ELSE IF ( I_NR_LANCAMENTO IS NOT NULL ) THEN
+         V_DS_WHERECAIXA = ' AND X.NR_LANCCAIXA = '||:I_NR_LANCAMENTO;
+      ELSE
+         V_DS_WHERECAIXA = ' AND X.DT_LANCAMENTO BETWEEN '''||:I_DT_INICIAL||''' AND '''||:I_DT_FINAL||'''';
+
+      V_DS_CONSULTA = ' SELECT X.CD_EMPRPROC, X.NR_PROCESSO, X.NR_LANCCAIXA, SUBSTRING(COALESCE(X.DS_COMPLEMENTO,''.'') FROM 1 FOR 150), X.NR_DOCUMENTO, X.VL_DOCUMENTO, '||
+                      '        X.DT_ESTORNO, X.DT_LANCAMENTO,X.ST_ESTORNO, X.TP_MOVTOCAIXA, '||
+                      '        COALESCE(X.CD_PESSOA,X.CD_PESSOACAIXA), P.NM_PESSOA, '||
+                      '        CASE WHEN X.TP_DOCUMENTO <> ''AV'' THEN '||
+                      '                 CASE WHEN X.TP_MOVTOCAIXA = ''R'' THEN '||
+                      '                     CASE WHEN X.TP_DOCUMENTO IN (''CH'',''CT'',''VA'') THEN COALESCE(COALESCE(MQ.CD_CONTACREDITO,H.CD_CONTACREDITO),MQ.CD_CONTADEBITO) ELSE COALESCE(H.CD_CONTACREDITO,X.CD_CONTACREDITO) END '||
+                      '                 ELSE '||
+                      '                    NULL '||
+                      '                 END '||
+                      '              ELSE COALESCE(H.CD_CONTADEBITO,X.CD_CONTADEBITO) '||
+                      '         END CD_CONTADEBITO, '||
+                      '         CASE WHEN X.TP_DOCUMENTO <> ''AV'' THEN '||
+                      '                 CASE WHEN X.TP_MOVTOCAIXA = ''R'' THEN '||
+                      '                    NULL '||
+                      '                 ELSE '||
+                      '                     CASE WHEN X.TP_DOCUMENTO IN (''CH'',''CT'',''VA'') THEN COALESCE(COALESCE(MQ.CD_CONTADEBITO,H.CD_CONTADEBITO),MQ.CD_CONTACREDITO) ELSE COALESCE(H.CD_CONTADEBITO,X.CD_CONTADEBITO) END '||
+                      '                 END '||
+                      '              ELSE COALESCE(H.CD_CONTACREDITO,X.CD_CONTACREDITO) '||
+                      '         END CD_CONTACREDITO, '||
+                      '         CASE WHEN X.TP_DOCUMENTO IN (''CH'',''CT'',''VA'') THEN COALESCE(MQ.CD_HISTORICO,H.CD_HISTORICO) '||
+                      '              ELSE H.CD_HISTORICO END CD_HISTORICO  '||
+                      '                              '||
+                      ' FROM MOVTOCAIXA X '||
+                      ' LEFT JOIN HISTORICO H ON (H.CD_HISTORICO  = X.CD_HISTORICO) '||
+                      ' LEFT JOIN PESSOA    P ON (P.CD_PESSOA     = COALESCE(X.CD_PESSOA,X.CD_PESSOACAIXA)) '||
+                      ' LEFT JOIN CHEQUE    Q ON (Q.CD_EMPRESA    = X.CD_EMPRCONTAS '||
+                      '                       AND Q.NR_LANCAMENTO = X.NR_LANCAMENTO '||
+                      '                       AND Q.CD_PESSOA     = X.CD_PESSOA '||
+                      '                       AND Q.CD_TIPOCONTA  = X.CD_TIPOCONTA '||
+                      '                       AND Q.NR_PARCELA    = X.NR_PARCELA) '||
+                      ' LEFT JOIN MOVTOCAIXA MQ ON (MQ.CD_EMPRESA   = Q.CD_EMPRCAIXA '||
+                      '                         AND MQ.NR_LANCCAIXA = Q.NR_LANCCAIXA) '||
+                      ' WHERE X.CD_EMPRESA = '||:I_CD_EMPRESA||V_DS_WHERECAIXA||
+                      ' ORDER BY X.NR_PROCESSO ';
+
+      FOR
+         EXECUTE STATEMENT :V_DS_CONSULTA
+         INTO   :V_CD_EMPPROC, :V_NR_PROCESSO, :V_NR_LANCCAIXA,:V_DS_COMPLEMENTO,:V_NR_DOCCAIXA,:V_VL_DOCCAIXA,:V_DT_ESTORNO,:V_DT_LANCCAIXA,
+                :V_ST_ESTORNO,:V_TP_MOVTOCAIXA, :V_CD_PESSOA, :V_NM_PESSOA, :V_CD_CONTADEBCAIXA,:V_CD_CONTACREDCAIXA, :V_CD_HISTORICO
+      DO BEGIN
+         --Select para ver ser Algum Historico do Mov Contabilizou
+         /*SELECT COUNT(X.NR_LANCCAIXA)
+         FROM MOVTOCAIXA X
+         LEFT JOIN CONTASHISTORICO CH ON (CH.CD_EMPRESA = X.CD_EMPRCONTAS
+                                      AND CH.NR_LANCAMENTO = X.NR_LANCAMENTO
+                                      AND CH.CD_PESSOA = X.CD_PESSOA
+                                      AND CH.CD_TIPOCONTA = X.CD_TIPOCONTA
+                                      AND CH.NR_PARCELA = X.NR_PARCELA)
+         LEFT JOIN HISTORICO H ON (H.CD_HISTORICO = COALESCE(CH.CD_HISTORICO,X.CD_HISTORICO))
+         WHERE X.CD_EMPRESA = :I_CD_EMPRESA
+           AND X.NR_LANCCAIXA = :V_NR_LANCCAIXA
+           AND CASE WHEN H.CD_HISTORICO IS NOT NULL AND H.ST_CONTABILIZA = 'S' THEN 1 WHEN H.CD_HISTORICO IS NULL THEN 1 ELSE 0 END = 1
+         INTO :V_COUNT;
+         */
+         IF ( (V_NR_PROCESSO IS NOT NULL)  AND  (V_NR_LANCCAIXA IS not NULL) ) THEN
+         BEGIN
+            SELECT COUNT(X.nr_processo)
+            FROM MOVTOPROCESSO X
+            INNER JOIN CONTASHISTORICO CH ON (CH.CD_EMPRESA = X.CD_EMPRCONTAS
+                                         AND CH.NR_LANCAMENTO = X.NR_LANCAMENTO
+                                         AND CH.CD_PESSOA = X.CD_PESSOA
+                                         AND CH.CD_TIPOCONTA = X.CD_TIPOCONTA
+                                         AND CH.NR_PARCELA = X.NR_PARCELA)
+            INNER JOIN HISTORICO H ON (H.CD_HISTORICO = CH.CD_HISTORICO)
+            WHERE X.CD_EMPRESA  =  :V_CD_EMPPROC
+              AND X.NR_PROCESSO =  :V_NR_PROCESSO
+              AND H.ST_CONTABILIZA = 'S'
+            INTO :V_COUNT;
+         END
+         ELSE
+         BEGIN
+            SELECT COUNT(X.NR_LANCCAIXA)
+            FROM MOVTOCAIXA X
+            LEFT JOIN CONTASHISTORICO CH ON (CH.CD_EMPRESA = X.CD_EMPRCONTAS
+                                         AND CH.NR_LANCAMENTO = X.NR_LANCAMENTO
+                                         AND CH.CD_PESSOA = X.CD_PESSOA
+                                         AND CH.CD_TIPOCONTA = X.CD_TIPOCONTA
+                                         AND CH.NR_PARCELA = X.NR_PARCELA)
+            LEFT JOIN HISTORICO H ON (H.CD_HISTORICO = COALESCE(CH.CD_HISTORICO,X.CD_HISTORICO))
+            WHERE X.CD_EMPRESA = :I_CD_EMPRESA
+              AND X.NR_LANCCAIXA = :V_NR_LANCCAIXA
+              AND CASE WHEN H.CD_HISTORICO IS NOT NULL AND H.ST_CONTABILIZA = 'S' THEN 1 WHEN H.CD_HISTORICO IS NULL THEN 1 ELSE 0 END = 1
+            INTO :V_COUNT;
+         END
+
+         IF (V_COUNT > 0 )  THEN
+            V_ST_HIST_CONTABILIZA = 'S';
+         ELSE
+            V_ST_HIST_CONTABILIZA = 'N';
+
+         --[ ATUALIZA A CONTA DE D…BITO OU CR…DITO ]--
+         SELECT O_DS_MENSAGEM, O_CD_CONTADEB, O_CD_CONTACRED
+         FROM   RETORNA_CONTACLIFOR(:I_CD_EMPRESA, :V_CD_PESSOA, :V_NR_CNPJCPF, :V_NM_PESSOA, COALESCE(:V_CD_CONTADEBCAIXA,-1), COALESCE(:V_CD_CONTACREDCAIXA,-1))
+         INTO   :V_DS_MENSAGEM, :V_CD_CONTADEBCAIXA, :V_CD_CONTACREDCAIXA;
+
+         IF (V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+            IF (:V_CD_PESSOA IS NULL) THEN BEGIN
+               V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||'PARA LAN«AMENTOS NA CONTA DE CLIENTE/FORNECEDORES A PESSOA DEVE SER INFORMADA. '||CHR(10)||
+                                                                        'VERIFIQUE SE O HIST”RICO E AS CONTAS CONT¡BEIS EST¡ CORRETAS, OU INFORME A PESSOA. '||CHR(10)||
+                                                                        'EMPRESA : '||COALESCE(:I_CD_EMPRESA,'')||CHR(10)||
+                                                                        'LAN«AMENTO : '||COALESCE(:V_NR_LANCCAIXA,'');
+               SUSPEND;
+               EXIT;
+            END
+            V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||V_DS_MENSAGEM
+                          ||'VERIFIQUE O CADASTRO DO HIST”RICO '||CHR(10)
+                          ||'CONTABILIZANDO O SEGUINTE MOVIMENTO DE CAIXA :'||CHR(10)
+                          ||'EMPRESA    = '''||COALESCE(:I_CD_EMPRESA  ,'')||''''||CHR(10)
+                          ||'LAN«AMENTO = '''||COALESCE(:V_NR_LANCCAIXA,'')||''''||CHR(10)
+                          ||'PROCESSO   = '''||COALESCE(:V_NR_PROCESSO ,'');
+
+            SUSPEND;
+            EXIT;
+         END
+         --[ ANULA O VALOR DA CONTA DE D…BITO OU DE CR…DITO ]--
+         IF (V_CD_CONTADEBCAIXA = -1) THEN
+            V_CD_CONTADEBCAIXA = NULL;
+         IF (V_CD_CONTACREDCAIXA = -1) THEN
+            V_CD_CONTACREDCAIXA = NULL;
+
+         IF (V_ST_ESTORNO = 'N') THEN
+         BEGIN
+            IF ((:V_CD_CONTADEBCAIXA IS NULL) AND (:V_CD_CONTACREDCAIXA IS NULL)) THEN BEGIN
+               V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)
+                             ||'A CONTAS DE D…BITO E CR…DITO EST√O EM BRANCO! '
+                             ||'VERIFIQUE O HIST”RICO OU AS CONTAS DO LANCTO DE CAIXA N∞: '||:V_NR_LANCCAIXA||COALESCE(' PROCESSO N∞: '||:V_NR_PROCESSO,'');
+               SUSPEND;
+               EXIT;
+            END
+         END
+
+        delete from MOVTOCONTABIL
+        where CD_EMPRCAIXA   = :I_CD_EMPRESA
+          and NR_LANCTOCAIXA = :V_NR_LANCCAIXA;
+
+         DELETE FROM MOVTOCAIXACTB
+         WHERE CD_EMPRESA   = :I_CD_EMPRESA
+           AND NR_LANCCAIXA = :V_NR_LANCCAIXA;
+
+         --[ INSERE A TABELA MOVTOCAIXACTB ]--
+            INSERT INTO MOVTOCAIXACTB(CD_EMPRESA,NR_LANCCAIXA,DS_COMPLEMENTO,NR_DOCUMENTO,VL_DOCUMENTO,DT_ESTORNO,NR_PROCESSO,
+                                      DT_LANCAMENTO,ST_ESTORNO,TP_MOVTOCAIXA,DT_REGISTRO, CD_CONTADEBITO, CD_CONTACREDITO, ST_CONTABILIZA,
+                                      CD_HISTORICO, CD_PESSOA)
+                               VALUES(:I_CD_EMPRESA,:V_NR_LANCCAIXA,:V_DS_COMPLEMENTO,:V_NR_DOCCAIXA,:V_VL_DOCCAIXA,:V_DT_ESTORNO,:V_NR_PROCESSO,
+                                      :V_DT_LANCCAIXA,:V_ST_ESTORNO,:V_TP_MOVTOCAIXA,'NOW', :V_CD_CONTADEBCAIXA, :V_CD_CONTACREDCAIXA, :V_ST_HIST_CONTABILIZA,
+                                      :V_CD_HISTORICO, :V_CD_PESSOA);
+         --[ GERA A INTEGRA«√O DESTE LANCTO DE CAIXA ]--
+         EXECUTE PROCEDURE GERA_MOVTOCONTABIL(:I_CD_EMPRESA,NULL,NULL,NULL,:V_NR_LANCCAIXA,'X')
+         RETURNING_VALUES (:V_DS_MENSAGEM);
+         IF ( V_DS_MENSAGEM IS NOT NULL ) THEN BEGIN
+            V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||V_DS_MENSAGEM;
+            SUSPEND;
+            EXIT;
+         END
+
+         --[ Agrupa os Lanctos de Contas Cont·beis Repetidas em um Novo Lancto ]--
+         IF ((:V_NR_PROCESSO IS NOT NULL) AND (V_ST_CONTABILIZAAGRUPADO = 'S') ) THEN BEGIN
+            EXECUTE PROCEDURE LANCAMENTO_COMPOSTOPROCESSO(:I_CD_EMPRESA,:V_NR_PROCESSO)
+                                         RETURNING_VALUES(:V_DS_MENSAGEM);
+            IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+               SUSPEND;
+               EXIT;
+            END
+         END
+
+
+      END
+   END
+   IF ( I_TP_INTEGRACAO IN ('C','T') ) THEN
+   BEGIN
+      IF ( (I_TP_INTEGRACAO = 'C') and (I_NR_LANCAMENTO is not null) ) THEN
+         V_DS_WHERECONTAS = COALESCE(V_DS_WHERECONTAS,'')||' AND C.NR_LANCAMENTO = '||:I_NR_LANCAMENTO;
+      V_DS_CONSULTA = ' SELECT C.NR_LANCAMENTO, T.TP_TIPOCONTA, C.NR_PARCELA, P.NM_PESSOA, P.NR_CNPJCPF, F.DS_FORMAPAGTO, '||
+                      '        C.NR_DOCUMENTO, C.DT_LANCAMENTO, C.DT_VENCIMENTO, C.VL_DOCUMENTO, C.VL_SALDO, '||
+                      '        C.ST_CONTAS,  C.TP_CONTAS, '||
+                      '        '||V_DS_DUPLICATA||' DS_COMPLEMENTO, P.CD_PESSOA, P.NM_PESSOA, C.CD_TIPOCONTA, C.TP_DOCUMENTO '||
+                      ' FROM   CONTAS C '||
+                      ' INNER JOIN TIPOCONTA       T  ON (T.CD_TIPOCONTA   = C.CD_TIPOCONTA) '||
+                      ' INNER JOIN PESSOA          P  ON (P.CD_PESSOA      = C.CD_PESSOA) '||
+                      ' LEFT  JOIN FORMAPAGTO      F  ON (F.CD_FORMAPAGTO  = C.CD_FORMAPAGTO) '||
+                      ' WHERE C.TP_DOCUMENTO IN (''ES'',''CS'',''DP'',''AP'',''RS'',''OC'',''CL'',''OB'',''RP'') '||
+                      ' AND   C.CD_EMPRESA   = '||:I_CD_EMPRESA
+                      ||COALESCE(V_DS_WHERECONTAS,'')||
+                      ' ORDER BY C.NR_LANCAMENTO ';
+      FOR
+         EXECUTE STATEMENT :V_DS_CONSULTA
+         INTO  :V_NR_LANCCONTAS, :V_TP_TIPOCONTA,  :V_NR_PARCELA,     :V_NM_PESSOACONTAS, :V_NR_CNPJCPF, :V_DS_FORMAPAGTOCONTAS,
+               :V_NR_DOCUMENTO,  :V_DT_LANCAMENTO, :V_DT_VENCIMENTO,  :V_VL_DOCUMENTO,    :V_VL_SALDO,
+               :V_ST_CONTAS,     :V_TP_NOTA,       :V_DS_COMPLEMENTO, :V_CD_PESSOA,       :V_NM_PESSOA,  :V_CD_TIPOCONTA, :V_TP_DOCUMENTO
+      DO BEGIN
+         V_ST_REPARCELAMENTO = 'N';
+
+         V_DS_CONSULTA =
+            'SELECT COUNT(CO.CD_EMPRESA)'||
+            'FROM CONTASHISTORICO CO '||
+            'INNER JOIN HISTORICO H ON (H.CD_HISTORICO = CO.CD_HISTORICO) '||
+            'WHERE CO.CD_EMPRESA    = '||:I_CD_EMPRESA||
+            '  AND CO.NR_LANCAMENTO = '||:V_NR_LANCCONTAS||
+            '  AND CO.CD_PESSOA     = '||:V_CD_PESSOA||
+            '  AND CO.CD_TIPOCONTA  = '||:V_CD_TIPOCONTA||
+            '  AND CO.NR_PARCELA    = '||:V_NR_PARCELA||
+            '  AND H.ST_CONTABILIZA = ''S''  ';
+         EXECUTE STATEMENT :V_DS_CONSULTA
+         INTO :V_COUNT;
+
+         if (V_COUNT > 0 )  then
+            V_ST_HIST_CONTABILIZA = 'S';
+         ELSE
+            V_ST_HIST_CONTABILIZA = 'N';
+
+         IF (:V_ST_CONTAS = 'A') THEN BEGIN
+            V_NR_REPARCELAMENTO = NULL;
+            SELECT FIRST 1 O.NR_REPARCELAMENTO
+            FROM   ORIGEMREPARCELAMENTO O
+            INNER JOIN REPARCELAMENTO R ON (R.CD_EMPRESA        = O.CD_EMPRESA
+                                        AND R.NR_REPARCELAMENTO = O.NR_REPARCELAMENTO
+                                        AND R.ST_REPARCELAMENTO = 'V')
+            WHERE  O.CD_EMPRCONTAS = :I_CD_EMPRESA
+            AND    O.NR_LANCAMENTO = :V_NR_LANCCONTAS
+            AND    O.CD_PESSOA     = :V_CD_PESSOA
+            AND    O.CD_TIPOCONTA  = :V_CD_TIPOCONTA
+            AND    O.NR_PARCELA    = :V_NR_PARCELA
+            INTO   :V_NR_REPARCELAMENTO;
+            IF (:V_NR_REPARCELAMENTO IS NOT NULL) THEN BEGIN
+               V_ST_CONTAS = 'T';
+               V_ST_REPARCELAMENTO = 'N';
+            END
+         END
+         IF (V_TP_DOCUMENTO = 'RP') THEN
+            V_ST_REPARCELAMENTO = 'S';
+
+         --[ APAGA OS REGISTROS ]--
+         DELETE FROM CONTASHISTORICOCTB C
+         WHERE  CD_EMPRESA    = :I_CD_EMPRESA
+         AND    NR_LANCAMENTO = :V_NR_LANCCONTAS
+         AND    TP_TIPOCONTA  = :V_TP_TIPOCONTA
+         AND    NR_PARCELA    = :V_NR_PARCELA;
+
+        DELETE FROM CONTASCTB
+         WHERE  CD_EMPRESA    = :I_CD_EMPRESA
+           AND  NR_LANCAMENTO = :V_NR_LANCCONTAS
+           AND  TP_TIPOCONTA  = :V_TP_TIPOCONTA
+           AND  NR_PARCELA    = :V_NR_PARCELA;
+
+         INSERT INTO CONTASCTB(NR_LANCTONOTA,CD_SERIE,TP_CONTAS,CD_EMPRESA,NR_LANCAMENTO,
+                                  TP_TIPOCONTA, NR_PARCELA, NM_PESSOA, NR_CNPJCPF, DS_FORMAPAGTO,NR_DOCUMENTO,
+                                  DT_LANCAMENTO, DT_VENCIMENTO, VL_DOCUMENTO, VL_SALDO,ST_CONTAS,
+                                  CD_CONTADEBITO, CD_CONTACREDITO, DS_COMPLEMENTO, ST_CONTABIL, DT_REGISTRO, CD_PESSOA)
+                        VALUES(NULL,NULL,:V_TP_NOTA,:I_CD_EMPRESA,:V_NR_LANCCONTAS, :V_TP_TIPOCONTA, :V_NR_PARCELA,
+                                  :V_NM_PESSOACONTAS, :V_NR_CNPJCPF, :V_DS_FORMAPAGTOCONTAS, :V_NR_DOCUMENTO, :V_DT_LANCAMENTO,
+                                  :V_DT_VENCIMENTO,:V_VL_DOCUMENTO, :V_VL_SALDO,:V_ST_CONTAS,
+                                  NULL, NULL, :V_DS_COMPLEMENTO, :V_ST_HIST_CONTABILIZA, 'NOW', :V_CD_PESSOA);
+
+         --[ BUSCA NOS CONTASHIST”RICOS OS MOVIMENTOS ]--
+         FOR SELECT H.CD_CONTADEBITO, H.CD_CONTACREDITO, H.CD_HISTORICO, CH.VL_DOCUMENTO
+             FROM   CONTASHISTORICO CH
+             INNER JOIN HISTORICO H ON (H.CD_HISTORICO   = CH.CD_HISTORICO)
+             WHERE CH.CD_EMPRESA    = :I_CD_EMPRESA
+               AND CH.NR_LANCAMENTO = :V_NR_LANCCONTAS
+               AND CH.CD_PESSOA     = :V_CD_PESSOA
+               AND CH.CD_TIPOCONTA  = :V_CD_TIPOCONTA
+               AND CH.NR_PARCELA    = :V_NR_PARCELA
+               AND H.ST_CONTABILIZA =  'S'
+             INTO  :V_CD_CONTADEBITO, :V_CD_CONTACREDITO, :V_CD_HISTORICO, :V_VL_HISTORICO
+         DO BEGIN
+            IF (((COALESCE(:V_CD_HISTREPARCELAMENTO,-1) = :V_CD_HISTORICO) AND (:V_ST_REPARCELAMENTO = 'S')) OR (:V_ST_REPARCELAMENTO = 'N')) THEN
+            BEGIN
+               --[ CONTAS ORIGEM DE REPARCELAMENTO INVERTE AS CONTAS CONT√ÅBEIS PARA ESTORNAR ]--
+               IF ((:V_ST_REPARCELAMENTO = 'S') AND (:V_TP_DOCUMENTO <> 'RP')) THEN BEGIN
+                  V_CD_CONTATROCA   = :V_CD_CONTADEBITO;
+                  V_CD_CONTADEBITO  = :V_CD_CONTACREDITO;
+                  V_CD_CONTACREDITO = :V_CD_CONTATROCA;
+               END
+               --[ ATUALIZA A CONTA DE D…BITO OU CR…DITO ]--
+               SELECT O_DS_MENSAGEM, O_CD_CONTADEB, O_CD_CONTACRED
+               FROM   RETORNA_CONTACLIFOR(:I_CD_EMPRESA, :V_CD_PESSOA, :V_NR_CNPJCPF, :V_NM_PESSOA, :V_CD_CONTADEBITO, :V_CD_CONTACREDITO)
+               INTO   :V_DS_MENSAGEM, :V_CD_CONTADEBITO, :V_CD_CONTACREDITO;
+               IF (V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+                  V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||CHR(10)||V_DS_MENSAGEM
+                                ||'VERIFIQUE O CADASTRO DO HIST”RICO '||CHR(10)
+                                ||'CONTABILIZANDO A SEGUINTE DUPLICATA :'||CHR(10)
+                                ||'EMPRESA    = '''||COALESCE(:I_CD_EMPRESA,'')||''''||CHR(10)
+                                ||'LAN«AMENTO = '''||COALESCE(:V_NR_LANCCONTAS,'')||''''||CHR(10)
+                                ||'PESSOA     = '''||COALESCE(:V_CD_PESSOA,'')||''''||CHR(10)
+                                ||'TIPO CONTA = '''||COALESCE(:V_CD_TIPOCONTA,'')||''''||CHR(10)
+                                ||'PARCELA    = '''||COALESCE(:V_NR_PARCELA,'')||''''||CHR(10)
+                                ||'HIST”RICO  = '''||COALESCE(:V_CD_HISTORICO,'')||'''';
+                  SUSPEND;
+                  EXIT;
+               END
+               INSERT INTO CONTASHISTORICOCTB (CD_EMPRESA, NR_LANCAMENTO, TP_TIPOCONTA, NR_PARCELA, NM_PESSOA, CD_HISTORICO,
+                                               CD_CONTADEBITO, CD_CONTACREDITO, VL_DOCUMENTO, DT_REGISTRO)
+               VALUES(:I_CD_EMPRESA, :V_NR_LANCCONTAS, :V_TP_TIPOCONTA, :V_NR_PARCELA, :V_NM_PESSOACONTAS, :V_CD_HISTORICO,
+                      :V_CD_CONTADEBITO, :V_CD_CONTACREDITO, :V_VL_HISTORICO, 'NOW');
+            END
+         END
+
+         EXECUTE PROCEDURE GERA_MOVTOCONTABIL(:I_CD_EMPRESA,:V_NR_LANCCONTAS,NULL,NULL,:V_NR_PARCELA,'C')
+         RETURNING_VALUES (:V_DS_MENSAGEM);
+         IF (:V_DS_MENSAGEM IS NOT NULL ) THEN
+         BEGIN
+           V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||V_DS_MENSAGEM;
+           SUSPEND;
+           EXIT;
+         END
+
+         --[ Agrupa os LanÁamentos de Contas Cont·beis Repetidas em um Novo LanÁamento ]--
+         IF (V_ST_CONTABILIZAAGRUPADO = 'S') THEN
+         BEGIN
+            SELECT O_DS_MENSAGEM
+            FROM LANCAMENTO_COMPOSTOCONTAS(:I_CD_EMPRESA,:V_NR_LANCCONTAS,:V_TP_TIPOCONTA ,:V_NR_PARCELA)
+            INTO :V_DS_MENSAGEM;
+            IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+               SUSPEND;
+               EXIT;
+            END
+         END
+
+      END
+      --[ BUSCA OS REPARCELAMENTOS DO PERÕçODO ]--
+      V_DS_CONSULTA = ' SELECT R.NR_REPARCELAMENTO '
+                    ||' FROM   REPARCELAMENTO R '
+                    ||' WHERE  R.CD_EMPRESA = '||:I_CD_EMPRESA
+                    ||' AND    R.DT_REPARCELAMENTO BETWEEN '''||:I_DT_INICIAL||''' AND '''||:I_DT_FINAL||''' ';
+      FOR EXECUTE STATEMENT :V_DS_CONSULTA
+                      INTO  :V_NR_REPARCELAMENTO
+      DO BEGIN
+
+         --[ APAGA MOVIMENTOS CONTABEIS DE REPARCELAMENTO ]--
+         DELETE FROM MOVTOCONTABIL M
+         WHERE M.CD_EMPRESA = :I_CD_EMPRESA
+           AND M.NR_DOCUMENTO = :V_NR_REPARCELAMENTO
+           AND M.TP_DOCTO = 'J';
+
+         --[ CONTABILIZA O REPARCELAMENTO ]--
+         SELECT CR.O_DS_MENSAGEM
+         FROM   CONTABILIZA_REPARCELAMENTO(:I_CD_EMPRESA,:V_NR_REPARCELAMENTO) CR
+         INTO   :V_DS_MENSAGEM;
+         IF (:V_DS_MENSAGEM IS NOT NULL ) THEN BEGIN
+            V_DS_MENSAGEM = '[ GERA_INTEGRACAO ]'||CHR(10)||V_DS_MENSAGEM;
+            SUSPEND;
+            EXIT;
+         END
+      END
+   END
+   --[ ESTOQUE ]--
+   IF (:I_TP_INTEGRACAO IN ('T', 'Q')) THEN BEGIN
+      --[ MOVIMENTOS DE ESTOQUE QUE N√O S√O DE NF ]--
+      FOR
+         SELECT M.NR_LANCAMENTO
+         FROM MOVESTOQUE M
+         WHERE M.CD_EMPRESA = :I_CD_EMPRESA
+           AND M.DT_LANCAMENTO BETWEEN :I_DT_INICIAL AND :I_DT_FINAL
+           AND NOT ((M.NR_LANCTONOTA IS NOT NULL) AND (M.TP_DOCUMENTO = 'NF'))
+         INTO :I_NR_LANCAMENTO
+      DO BEGIN
+         --[ GERA A INTEGRACAO DO ESTOQUE ]--
+         EXECUTE PROCEDURE CONTABILIZA_ESTOQUE(:I_CD_EMPRESA, :I_NR_LANCAMENTO) RETURNING_VALUES :V_DS_MENSAGEM;
+         IF (:V_DS_MENSAGEM IS NOT NULL) THEN BEGIN
+            SUSPEND;
+            EXIT;
+         END
+      END
+   END
+   SUSPEND;
+END^
+
+SET TERM ; ^
+

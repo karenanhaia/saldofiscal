@@ -1,0 +1,533 @@
+SET TERM ^ ;
+
+CREATE OR ALTER procedure GERA_DARF (
+    I_CD_EMPRESA integer,
+    I_CD_CODRECEITA integer,
+    I_DT_REFERENCIA date,
+    I_VL_OUTRASRECEITAS numeric(15,2),
+    I_DT_VENCIMENTO date)
+returns (
+    O_DS_MENSAGEM varchar(2000),
+    O_TP_GUIA varchar(1),
+    O_NR_CNPJCPF varchar(22),
+    O_DT_NORMAL date,
+    O_DT_VENCIMENTO date,
+    O_NR_TELEFONE varchar(15),
+    O_VL_RBRUTA numeric(15,2),
+    O_VL_RETIDO numeric(15,2),
+    O_PC_ALIQUOTA numeric(3,2),
+    O_VL_IMPOSTO numeric(15,2),
+    O_VL_ACUMULADO numeric(15,2),
+    O_VL_JUROS numeric(15,2),
+    O_VL_MULTA numeric(15,2),
+    O_VL_TOTAL numeric(15,2))
+as
+declare variable V_TP_VENCIMENTO varchar(1);
+declare variable V_NR_DIAVENCIMENTO integer;
+declare variable V_PC_BASE numeric(15,2);
+declare variable V_VL_NOTA numeric(15,2);
+declare variable V_VL_MINIMO numeric(15,2);
+declare variable V_TP_CALCULO varchar(1);
+declare variable V_CD_IMPOSTO integer;
+declare variable V_VL_SERVICO numeric(15,2);
+declare variable V_PC_RSERVICO numeric(15,2);
+declare variable V_PC_SERVICO numeric(15,2);
+declare variable V_PC_AUMENTO numeric(15,2);
+declare variable V_VL_DEVOLUCAO numeric(15,2);
+declare variable V_VL_DEVBRUTA numeric(15,2);
+declare variable V_PC_IMPINICIAL numeric(15,2);
+declare variable V_VL_IMPRETIDO numeric(15,2);
+declare variable V_VL_ABATIMENTO numeric(15,2);
+declare variable V_TP_IMPOSTO varchar(1);
+declare variable V_TP_RECEITABRUTA varchar(1);
+declare variable V_FILTRO varchar(150);
+declare variable V_VL_PARCELA numeric(15,2);
+declare variable V_VL_INICIAL numeric(15,2);
+declare variable V_CD_EMPRMTF varchar(400);
+declare variable V_CD_EMPRESA integer;
+declare variable V_VL_TRIBUTADO numeric(15,2);
+declare variable V_TP_APURACAO varchar(1);
+declare variable V_DS_APURACAO varchar(150);
+declare variable V_DT_REGJUNTA date;
+declare variable V_DT_NOTAFISCAL date;
+declare variable V_NR_MESINICIAL integer;
+declare variable V_VL_MUDANCAEPP numeric(15,2);
+declare variable V_NR_SEQUENCIA integer;
+declare variable V_PC_ALIQUOTAIMP numeric(15,2);
+declare variable V_ST_FEDERAL varchar(1);
+declare variable V_VL_NFSERVICO numeric(15,2);
+declare variable V_VL_CUPOMFISCAL numeric(15,2);
+declare variable V_DT_INICIAL date;
+declare variable V_VL_ISENTO numeric(15,2);
+declare variable V_VL_OUTRAS numeric(15,2);
+declare variable V_DS_CONSULTA varchar(400);
+declare variable V_VL_IPI numeric(15,2);
+declare variable V_ST_LALUR varchar(1);
+begin
+   --[ Verifica os Parâmetros ]--
+   if (I_CD_EMPRESA is null) then
+      O_DS_MENSAGEM = '[GERA_DARF]'||CHR(10)||CHR(10)||'A empresa deve ser Informada !';
+   else if (I_CD_CODRECEITA is null) then
+      O_DS_MENSAGEM = '[GERA_DARF]'||CHR(10)||CHR(10)||'O código da receita deve ser Informado !';
+   else if (I_DT_REFERENCIA is null) then
+      O_DS_MENSAGEM = '[GERA_DARF]'||CHR(10)||CHR(10)||'A data de referênca deve ser Informada !';
+   if (O_DS_MENSAGEM is not null) then begin
+      suspend;
+      exit;
+   end
+
+   --[ Verifica o Tipo da Guia de Impostos ]--
+   select TP_GUIA, NR_DIAVENCIMENTO, TP_VENCIMENTO, I.CD_IMPOSTO, I.TP_IMPOSTO, I.TP_RECEITABRUTA, C.TP_APURACAO, C.ST_LALUR
+   from   CODRECEITA C
+   inner join IMPOSTO I on (I.CD_IMPOSTO = C.CD_IMPOSTO)
+   where  C.CD_EMPRESA    = :I_CD_EMPRESA
+   and    C.CD_CODRECEITA = :I_CD_CODRECEITA
+   into   :O_TP_GUIA, :V_NR_DIAVENCIMENTO, :V_TP_VENCIMENTO, :V_CD_IMPOSTO, :V_TP_IMPOSTO, :V_TP_RECEITABRUTA, :V_TP_APURACAO, :V_ST_LALUR;
+
+   --[ Verifica se o calculo é nesta procedure ou não ]--
+   if (:V_ST_LALUR = 'S') then begin
+      select L.O_DS_MENSAGEM, L.O_TP_GUIA, L.O_NR_CNPJCPF, L.O_DT_NORMAL, L.O_DT_VENCIMENTO,
+             L.O_NR_TELEFONE, L.O_VL_RBRUTA, L.O_VL_RETIDO, L.O_PC_ALIQUOTA, L.O_VL_IMPOSTO,
+             L.O_VL_ACUMULADO, L.O_VL_JUROS, L.O_VL_MULTA, L.O_VL_TOTAL
+      from   GERA_DARFLALUR(:I_CD_EMPRESA,:I_CD_CODRECEITA,:I_DT_REFERENCIA,:I_VL_OUTRASRECEITAS,:I_DT_VENCIMENTO) L
+      into   :O_DS_MENSAGEM, :O_TP_GUIA, :O_NR_CNPJCPF, :O_DT_NORMAL, :O_DT_VENCIMENTO,
+             :O_NR_TELEFONE, :O_VL_RBRUTA, :O_VL_RETIDO, :O_PC_ALIQUOTA, :O_VL_IMPOSTO,
+             :O_VL_ACUMULADO, :O_VL_JUROS, :O_VL_MULTA, :O_VL_TOTAL;
+      suspend;
+      exit;
+   end
+
+   V_DS_APURACAO = '';
+   O_VL_RBRUTA   = 0;
+   --[ Imposto com Regime de Apuração Mensal ]--
+   if (:V_TP_APURACAO = 'M') then begin
+      V_DS_APURACAO = ' AND N.DT_EMISSAO BETWEEN FIRSTDAYMONTH('''||:I_DT_REFERENCIA||''') and ('''||:I_DT_REFERENCIA||''') ';
+      V_DT_INICIAL  = FIRSTDAYMONTH(:I_DT_REFERENCIA);
+   --[ Imposto com Regime de Apuração Trimestral ]--
+   end else if (:V_TP_APURACAO = 'T') then begin
+      V_DS_APURACAO = ' AND N.DT_EMISSAO BETWEEN INCDATE(FIRSTDAYMONTH('''||:I_DT_REFERENCIA||'''),0,-2,0) and ('''||:I_DT_REFERENCIA||''') ';
+      V_DT_INICIAL  = INCDATE(FIRSTDAYMONTH(:I_DT_REFERENCIA),0,-2,0);
+   end
+
+   --[ Busca os dados Referentes a Empresa, Quando for Imposto Simples Busca o valor de Receita Bruta Inicial ]--
+   select first 1 P.NR_CNPJCPF, EP.NR_FONE, case when :V_TP_IMPOSTO = 'M' then coalesce(E.PC_IMPINICIAL,0) else 0 end,
+          E.DT_REGISTROJUNTA, E.ST_FEDERAL
+   from EMPRESA E
+   inner join PESSOA          P on (P.CD_PESSOA  = E.CD_PESSOA)
+   left  join ENDERECOPESSOA EP on (EP.CD_PESSOA = P.CD_PESSOA)
+   where E.CD_EMPRESA = :I_CD_EMPRESA
+   order by EP.CD_ENDERECO
+   into  :O_NR_CNPJCPF, :O_NR_TELEFONE, :V_PC_IMPINICIAL, :V_DT_REGJUNTA, :V_ST_FEDERAL;
+
+   --[ Se a Empresa Abriu no Mesmo Ano que a Guia que está sendo Gerada e o Imposto é Simples ]--
+   V_NR_MESINICIAL = 12;
+   if (:V_TP_IMPOSTO = 'M') then begin
+      --[ Calcula Receita Bruta Proporcional ]--
+      if (extract(year from :V_DT_REGJUNTA) = extract(year from :I_DT_REFERENCIA)) then begin
+         --[ Busca a Data de Emissão da Primeira NF ]--
+         select min(N.DT_EMISSAO)
+         from   NOTACTB N
+         where  N.CD_EMPRESA = :I_CD_EMPRESA
+         and    N.TP_NOTA    = 'S'
+         into   :V_DT_NOTAFISCAL;
+
+         V_NR_MESINICIAL = 13 - extract(month from :V_DT_NOTAFISCAL);
+      end
+      
+      --[ Busca o Valor de Transição para EPP ]--
+      select (P.VL_MUDANCAEPP / 12 * :V_NR_MESINICIAL)
+      from   PARMSISTEMA P
+      into   :V_VL_MUDANCAEPP;
+   end
+
+   --[ Se Gera os Impostos Agrupando com as Filiais ]--
+   if (:V_TP_IMPOSTO <> 'I') then begin
+      --[ Busca todas as Empresas Matriz e Filial ]--
+      V_CD_EMPRMTF = '';
+      for select CD_EMPRESA
+          from   RETORNA_MATRIZEFILIAL(:I_CD_EMPRESA)
+          into   :V_CD_EMPRESA
+      do begin
+         V_CD_EMPRMTF = V_CD_EMPRMTF||cast(V_CD_EMPRESA as varchar(10))||',';
+      end
+      V_CD_EMPRMTF = SUBSTR(:V_CD_EMPRMTF,1,STRLEN(V_CD_EMPRMTF)-1);
+   --[ Busca os Totais de Impostos somente da Empresa ]--
+   end else
+      V_CD_EMPRMTF = :I_CD_EMPRESA;
+
+   --[ Busca os dados das notas no período ]--
+   select sum(V.VL_TOTAL), I.PC_BASE, I.PC_ALIQUOTA, coalesce(I.VL_MINIMO,0), I.TP_CALCULO,
+          sum(V.VL_ISENTO), sum(V.VL_OUTRAS)
+   from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           :V_DS_APURACAO||
+                           ' AND N.ST_NOTA = ''V'' ',COALESCE(' AND IP.TP_IMPOSTO = '''||:V_TP_IMPOSTO||''' ',' '),
+                           ' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           ' AND N.TP_TRIBUTACAO not in (''CANC'') '||
+                           :V_DS_APURACAO) V
+   inner join IMPOSTO     I on (I.CD_IMPOSTO  = :V_CD_IMPOSTO)
+   inner join IMPOSTOCFO IC on (IC.CD_IMPOSTO = I.CD_IMPOSTO
+                            and IC.CD_CFO     = V.CD_CFO)
+   where V.TP_NOTA       = 'S'
+   and   I.ST_ATIVO      = 'S'
+   and   V.TP_IMPOSTO    <> 'P'
+   group by I.PC_BASE, I.PC_ALIQUOTA, coalesce(I.VL_MINIMO,0), I.TP_CALCULO, I.CD_IMPOSTO
+   into  :V_VL_NOTA, :V_PC_BASE, :O_PC_ALIQUOTA, :V_VL_MINIMO, :V_TP_CALCULO, :V_VL_ISENTO,
+         :V_VL_OUTRAS;
+   V_VL_NOTA = :V_VL_NOTA + coalesce(:I_VL_OUTRASRECEITAS,0);
+   --[ Imposto ICMS ]--
+   if (:V_TP_IMPOSTO = 'I') then
+       V_VL_NOTA = :V_VL_NOTA - coalesce(:V_VL_ISENTO,0) - coalesce(:V_VL_OUTRAS,0);
+   --[ Quando Tem Imposto IPI destacado na NF Reduz ele da Base de Cálculo dos Impostos ]--
+   if ((:V_TP_IMPOSTO <> 'P') and (:V_TP_IMPOSTO <> 'M')) then begin
+      if (:V_TP_APURACAO = 'M') then begin
+         V_DS_CONSULTA = ' select sum(S.VL_DEBITO) '||
+                         ' from   SALDOFISCAL S '||
+                         ' where  S.CD_EMPRESA in ('||:V_CD_EMPRMTF||')'||
+                         ' and    S.TP_IMPOSTO = ''P'' '||
+                         ' and    S.DT_COMPETENCIA = '''||DATETOSTR(:I_DT_REFERENCIA,'%m/%Y')||'''';
+         execute statement :V_DS_CONSULTA
+         into :V_VL_IPI;
+      end else if (:V_TP_APURACAO = 'T') then begin
+         V_DS_CONSULTA = ' select sum(S.VL_DEBITO) '||
+                         ' from   SALDOFISCAL S '||
+                         ' where  S.CD_EMPRESA in ('||:V_CD_EMPRMTF||')'||
+                         ' and    S.TP_IMPOSTO = ''P'' '||
+                         ' and   ((S.DT_COMPETENCIA = '''||DATETOSTR(:I_DT_REFERENCIA,'%m/%Y')||''') '||
+                         ' or     (S.DT_COMPETENCIA = '''||DATETOSTR(INCDATE(:I_DT_REFERENCIA,0,-1,0),'%m/%Y')||''') '||
+                         ' or     (S.DT_COMPETENCIA = '''||DATETOSTR(INCDATE(:I_DT_REFERENCIA,0,-2,0),'%m/%Y')||''')) ';
+         execute statement :V_DS_CONSULTA
+         into :V_VL_IPI;
+      end
+      V_VL_NOTA = :V_VL_NOTA - coalesce(:V_VL_IPI,0);
+   end
+
+   --[ Busca o Valor do Imposto Acumulado ]--
+   select coalesce(sum(R.VL_IMPOSTO),0)
+   from   RELFATURAMENTO R
+   where  R.CD_EMPRESA        = :I_CD_EMPRESA
+   and    R.CD_EMPRCODRECEITA = :I_CD_EMPRESA
+   and    R.CD_CODRECEITA     = :I_CD_CODRECEITA
+   and    R.DT_APURACAO       = LASTDAYMONTH(INCDATE(:I_DT_REFERENCIA,0,-1,0))
+   into   :O_VL_ACUMULADO;
+   if (not (:O_VL_ACUMULADO < coalesce(:V_VL_MINIMO,0))) then
+      O_VL_ACUMULADO = 0;
+
+   --[ Busca os dados de notas de Serviço ]--
+   select sum(V.VL_TOTAL)
+   from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           :V_DS_APURACAO||
+                           ' AND N.ST_NOTA = ''V'' '||
+                           ' AND ((IT.TP_ITEM = ''S'') or (N.CD_REMETENTE is not null)) ','  ',
+                           ' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           :V_DS_APURACAO||
+                           ' AND N.TP_TRIBUTACAO = ''ISS'' ') V
+   inner join IMPOSTO     I on (I.CD_IMPOSTO  = :V_CD_IMPOSTO)
+   inner join IMPOSTOCFO IC on (IC.CD_IMPOSTO = I.CD_IMPOSTO
+                            and IC.CD_CFO     = V.CD_CFO)
+   where V.TP_NOTA       = 'S'
+   and   I.ST_ATIVO      = 'S'
+   into  :V_VL_NFSERVICO;
+
+   --[ Busca o Valor Total de Cupom Fiscal ]--
+   select sum(V.VL_TOTAL), sum(V.VL_ISENTO), sum(V.VL_OUTRAS)
+   from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = -1 AND 1 = 0 ',
+                           ' AND N.CD_EMPRESA = -1 AND 1 = 0 ',
+                           ' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           ' AND N.TP_TRIBUTACAO not in (''ISS'',''CANC'') '||
+                           :V_DS_APURACAO) V
+   inner join IMPOSTO     I on (I.CD_IMPOSTO  = :V_CD_IMPOSTO)
+   inner join IMPOSTOCFO IC on (IC.CD_IMPOSTO = I.CD_IMPOSTO
+                            and IC.CD_CFO     = V.CD_CFO)
+   where V.TP_NOTA       = 'S'
+   and   I.ST_ATIVO      = 'S'
+   into :V_VL_CUPOMFISCAL, :V_VL_ISENTO, :V_VL_OUTRAS;
+   if (:V_TP_IMPOSTO = 'I') then
+      V_VL_CUPOMFISCAL = coalesce(:V_VL_CUPOMFISCAL,0) - coalesce(:V_VL_ISENTO,0) - coalesce(:V_VL_OUTRAS,0);
+
+   --[ Soma o Total das devoluções de Compra no Período ]--
+   select sum(V.VL_TOTAL)
+   from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           :V_DS_APURACAO||
+                           ' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''E'' ',' ',
+                           ' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           ' AND N.TP_TRIBUTACAO not in (''N'',''I'',''ISS'',''CANC'') '||
+                           :V_DS_APURACAO) V
+   inner join CFO on (CFO.CD_CFO       = V.CD_CFO
+                  and CFO.ST_DEVOLUCAO = 'S')
+   into  :V_VL_DEVOLUCAO;
+
+   --[ Verifica Imposto Progressivo ]--
+   if (V_TP_CALCULO = 'P') then begin
+      --[ Imposto Progressivo com Receita Bruta Anual ]--
+      if (V_TP_RECEITABRUTA = 'A') then
+         V_FILTRO = ' AND N.DT_EMISSAO BETWEEN cast(''01/01/''||extract(year from cast('''||:I_DT_REFERENCIA||''' as date)) as date) and '''||:I_DT_REFERENCIA||'''';
+      --[ Imposto Progressivo com Receita Bruta Mensal ]--
+      else if (V_TP_RECEITABRUTA = 'M') then
+         V_FILTRO = ' AND N.DT_EMISSAO BETWEEN FIRSTDAYMONTH('''||:I_DT_REFERENCIA||''') and ('''||:I_DT_REFERENCIA||''') ';
+      --[ Imposto Progressivo com Receita Bruta Acumulada dos Últimos 12 Meses ]--
+      else if (V_TP_RECEITABRUTA = 'D') then
+         V_FILTRO = ' AND N.DT_EMISSAO BETWEEN FIRSTDAYMONTH(INCDATE('''||:I_DT_REFERENCIA||''',0,-11,0)) AND '''||:I_DT_REFERENCIA||''' ';
+      else begin
+         O_DS_MENSAGEM = 'O Tipo da Receita Bruta deve ser Informado [TFI005]!'||Chr(10)||Chr(10)||
+                         'Tipo: "'||coalesce(V_TP_RECEITABRUTA,'')||'" '||Chr(10)||
+                         'Imposto: "'||:V_CD_IMPOSTO||'"';
+         suspend;
+         exit;
+      end
+
+      --[ Busca a Receita Bruta Acumulada das Devoluções de Compras ]--
+      V_VL_DEVBRUTA = 0;
+      select sum(V.VL_TOTAL)
+      from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                              :V_FILTRO||
+                              ' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''E'' ',' ',
+                              ' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                              ' AND N.TP_TRIBUTACAO not in (''N'',''I'',''ISS'',''CANC'') '||
+                              :V_FILTRO) V
+      inner join CFO on (CFO.CD_CFO       = V.CD_CFO
+                     and CFO.ST_DEVOLUCAO = 'S')
+      into  :V_VL_DEVBRUTA;
+
+      --[ Busca a Receita Bruta Acumulada ]--
+      select first 1 coalesce(sum(V.VL_TOTAL),0), IP.PC_ALIQUOTA, coalesce(IP.VL_ABATIMENTO,0),
+             sum(V.VL_ISENTO), sum(V.VL_OUTRAS)
+      from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                              :V_FILTRO||
+                              ' AND N.ST_NOTA = ''V'' ','  ',
+                              ' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                              ' AND N.TP_TRIBUTACAO not in (''CANC'') '||
+                              :V_FILTRO) V
+      inner join IMPOSTO      I on (I.CD_IMPOSTO  = :V_CD_IMPOSTO)
+      inner join IMPOSTOPROG IP on (IP.CD_IMPOSTO = I.CD_IMPOSTO)
+      inner join IMPOSTOCFO  IC on (IC.CD_IMPOSTO = I.CD_IMPOSTO
+                                and IC.CD_CFO     = V.CD_CFO)
+      where V.TP_NOTA  = 'S'
+      and   I.ST_ATIVO = 'S'
+      and   :I_DT_REFERENCIA between IP.DT_INICIAL and coalesce(IP.DT_FINAL,:I_DT_REFERENCIA)
+      group by IP.VL_INICIAL, IP.VL_FINAL, IP.PC_ALIQUOTA, IP.VL_ABATIMENTO
+      having (((sum(V.VL_TOTAL) - coalesce(:V_VL_DEVBRUTA,0) + coalesce(:I_VL_OUTRASRECEITAS,0)) / 12) * :V_NR_MESINICIAL)
+             between ((IP.VL_INICIAL / 12) * :V_NR_MESINICIAL) and ((IP.VL_FINAL / 12) * :V_NR_MESINICIAL)
+      into  :O_VL_RBRUTA, :O_PC_ALIQUOTA, :V_VL_ABATIMENTO,
+            :V_VL_ISENTO, :V_VL_OUTRAS;
+      O_VL_RBRUTA = :O_VL_RBRUTA - coalesce(:V_VL_DEVBRUTA,0) + coalesce(:I_VL_OUTRASRECEITAS,0);
+      if (:V_TP_IMPOSTO = 'I') then
+         O_VL_RBRUTA = :O_VL_RBRUTA - coalesce(:V_VL_ISENTO,0) - coalesce(:V_VL_OUTRAS,0);
+      if (:O_VL_RBRUTA < 0) then
+        O_VL_RBRUTA = 0;
+        
+      --[ Se o Imposto é o Simples e a Empresa é ME ou EPP e a guia é do Mês 12 ]--
+      if ((:V_TP_IMPOSTO = 'M') and (:V_ST_FEDERAL <> 'N') and (extract(month from :I_DT_REFERENCIA) = 12)) then begin
+         --[ Muda a Empresa de ME para EPP Automaticamente ou de EPP para ME ]--
+         if (O_VL_RBRUTA > :V_VL_MUDANCAEPP) then begin
+            --[ Encontra a Linha que Identifica a Mudança de Aliquota ]--
+            select I.NR_SEQUENCIA + 1
+            from   IMPOSTOPROG I
+            where  I.CD_IMPOSTO = :V_CD_IMPOSTO
+            and    I.VL_FINAL   = :V_VL_MUDANCAEPP
+            and    :I_DT_REFERENCIA between I.DT_INICIAL and coalesce(I.DT_FINAL,:I_DT_REFERENCIA)
+            into   :V_NR_SEQUENCIA;
+            
+            --[ Alíquota Inicial do Imposto ]--
+            V_PC_ALIQUOTAIMP = null;
+            select I.PC_ALIQUOTA
+            from   IMPOSTOPROG I
+            where  I.CD_IMPOSTO   = :V_CD_IMPOSTO
+            and    I.NR_SEQUENCIA = :V_NR_SEQUENCIA
+            and    :I_DT_REFERENCIA between I.DT_INICIAL and coalesce(I.DT_FINAL,:I_DT_REFERENCIA)
+            into   :V_PC_ALIQUOTAIMP;
+            
+            if (:V_PC_ALIQUOTAIMP is null) then begin
+               O_DS_MENSAGEM = '[GERA_DARF] '||Chr(13)||Chr(13)||'Não Existe Imposto Progressivo Cadastrado com a Sequência '||:V_NR_SEQUENCIA||' para o Imposto '||:V_CD_IMPOSTO||' [TFI005]!';
+               suspend;
+               exit;
+            end
+         end
+      end
+
+      --[ Se a Alíquota Inicial for Maior Usa-se a Alíquota Inicial ]--
+      if (:V_PC_IMPINICIAL > 0) then
+         if (:V_PC_IMPINICIAL > :O_PC_ALIQUOTA) then
+            O_PC_ALIQUOTA = :V_PC_IMPINICIAL;
+
+      --[ Busca o valor Total das notas de Serviço Acumulado ]--
+      /* OBS: As Notas Fiscais de Frete Também Contam para Somar na Receita de Serviços */
+      select sum(coalesce(V.VL_TOTAL,0))
+      from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                              :V_FILTRO||
+                              ' AND N.ST_NOTA = ''V'' '||
+                              ' AND ((IT.TP_ITEM = ''S'') or (N.CD_REMETENTE is not null)) ','  ',
+                              ' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                              :V_FILTRO||
+                              ' AND N.TP_TRIBUTACAO = ''ISS'' ') V
+      inner join IMPOSTO      I on (I.CD_IMPOSTO  = :V_CD_IMPOSTO)
+      inner join IMPOSTOCFO  IC on (IC.CD_IMPOSTO = I.CD_IMPOSTO
+                                and IC.CD_CFO     = V.CD_CFO)
+      where V.TP_NOTA  = 'S'
+      and   I.ST_ATIVO = 'S'
+      into  :V_VL_SERVICO;
+
+      --[ Calcula quanto representa o valor de Serviço sobre a Receita Acumulada ]--
+      V_PC_RSERVICO = ((coalesce(:V_VL_SERVICO,0) * 100)/coalesce(nullif(:O_VL_RBRUTA,0),coalesce(:V_VL_SERVICO,1)));
+
+      --[ Verifica nos Parâmetros o Percentual de Serviço e de Aumento ]--
+      select coalesce(P.PC_SERVICO,0), coalesce(P.PC_AUMENTO,0)
+      from   PARMFISCAL P
+      where  P.CD_EMPRESA = :I_CD_EMPRESA
+      into   :V_PC_SERVICO, :V_PC_AUMENTO;
+      
+      if ((V_PC_RSERVICO > V_PC_SERVICO) and (V_PC_AUMENTO > 0)) then
+         O_PC_ALIQUOTA = O_PC_ALIQUOTA + ((O_PC_ALIQUOTA * V_PC_AUMENTO)/100);
+   end
+
+   --[ Calcula o Imposto com Receita Bruta Mensal ]--
+   if (V_TP_RECEITABRUTA = 'M') then begin
+      O_VL_IMPOSTO   = 0;
+      V_VL_PARCELA   = 0;
+      V_VL_TRIBUTADO = 0;
+      --[ Busca Todas as Alíquotas Possíveis ]--
+      for select I.VL_INICIAL, I.PC_ALIQUOTA
+          from   IMPOSTOPROG I
+          where  I.CD_IMPOSTO  = :V_CD_IMPOSTO
+          and    I.VL_INICIAL <= (:V_VL_NOTA - coalesce(:V_VL_DEVOLUCAO,0))
+          and    :I_DT_REFERENCIA between I.DT_INICIAL and coalesce(I.DT_FINAL,:I_DT_REFERENCIA)
+          order by I.NR_SEQUENCIA desc
+          into   :V_VL_INICIAL,  :O_PC_ALIQUOTA
+      do begin
+          V_VL_PARCELA   = :V_VL_NOTA - :V_VL_TRIBUTADO - :V_VL_INICIAL - coalesce(:V_VL_DEVOLUCAO,0);
+          V_VL_TRIBUTADO = :V_VL_TRIBUTADO + :V_VL_PARCELA;
+          O_VL_IMPOSTO   = :O_VL_IMPOSTO + coalesce(((((V_VL_PARCELA * V_PC_BASE)/ 100) * O_PC_ALIQUOTA)/100),0) + coalesce(:O_VL_ACUMULADO,0);
+      end
+   --[ Calcula o Imposto com Receita Bruta Anual ]--
+   end else begin
+      O_VL_IMPOSTO = coalesce((((((V_VL_NOTA - coalesce(:V_VL_ABATIMENTO,0) - coalesce(:V_VL_DEVOLUCAO,0)) * V_PC_BASE)/ 100) * O_PC_ALIQUOTA)/100),0) + coalesce(:O_VL_ACUMULADO,0);
+   end
+
+   --[ Se o Imposto é IPI, Cofins, CSLL, IRPJ ou PIS Busca dos Saldos das Notas Fiscais ]--
+/*   if (:V_TP_IMPOSTO in ('P','F','L','J','S')) then begin
+      V_DS_CONSULTA = ' select sum(S.VL_SALDOIMPOSTO), sum(S.VL_DEBITO) '||
+                      ' from   SALDOFISCAL S     '||
+                      ' where  S.CD_EMPRESA in ( '||:V_CD_EMPRMTF||')'||
+                      ' and    S.TP_IMPOSTO = '''||:V_TP_IMPOSTO||''''||
+                      ' and    S.DT_COMPETENCIA = '''||DATETOSTR(:I_DT_REFERENCIA,'%m/%Y')||'''';
+      execute statement :V_DS_CONSULTA
+                   into :O_VL_IMPOSTO, :O_VL_RBRUTA;
+      O_PC_ALIQUOTA  = 0;
+      O_VL_IMPOSTO   = :O_VL_IMPOSTO + :O_VL_ACUMULADO;
+      O_VL_TOTAL     = :O_VL_IMPOSTO;
+      V_VL_NOTA      = :O_VL_RBRUTA;
+      V_VL_NFSERVICO = 0;
+   end  */
+
+   --[ Busca o Valor de Impostos Retidos ]--
+   select sum(V.VL_IMPOSTO) VL_IMPOSTO
+   from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           :V_DS_APURACAO||
+                           ' AND N.ST_NOTA = ''V'' AND IT.TP_ITEM = ''S'' ',' AND IP.ST_RETIDO = ''S'' ',
+                           ' AND N.CD_EMPRESA IN ( '||:V_CD_EMPRMTF||' ) '||
+                           ' AND N.TP_TRIBUTACAO not in (''N'',''I'',''ISS'',''CANC'') '||
+                           :V_DS_APURACAO) V
+   inner join IMPOSTO      I on (I.CD_IMPOSTO  = :V_CD_IMPOSTO)
+   inner join IMPOSTO     IR on (IR.TP_IMPOSTO = I.TP_IMPOSTO
+                             and IR.ST_RETIDO  = 'S')
+   inner join IMPOSTOCFO  IC on (IC.CD_IMPOSTO = IR.CD_IMPOSTO
+                             and IC.CD_CFO     = V.CD_CFO)
+   where V.TP_NOTA     = 'S'
+   and   I.ST_ATIVO    = 'S'
+   and   IR.TP_IMPOSTO = V.TP_IMPOSTO
+   into  :V_VL_IMPRETIDO;
+
+   --[ Retira do valor do Imposto os Impostos Retidos ]--
+   O_VL_IMPOSTO = coalesce(:O_VL_IMPOSTO,0) - coalesce(:V_VL_IMPRETIDO,0);
+   O_VL_RETIDO  = coalesce(:V_VL_IMPRETIDO,0);
+
+   --[ Calcula o Dia do Vencimento ]--
+   if (:V_NR_DIAVENCIMENTO = 31) then begin
+      if (extract(month from :I_DT_REFERENCIA) in (2,4,6,9,11)) then begin
+         V_NR_DIAVENCIMENTO = 1;
+         O_DT_VENCIMENTO    = LASTDAYMONTH(INCDATE(cast(extract(month from :I_DT_REFERENCIA)
+                                          ||'/'||:V_NR_DIAVENCIMENTO||'/'||extract(year from :I_DT_REFERENCIA) as date),0,1,0));
+      end else begin
+         O_DT_VENCIMENTO = INCDATE(cast(extract(month from :I_DT_REFERENCIA)
+                           ||'/'||:V_NR_DIAVENCIMENTO||'/'||extract(year from :I_DT_REFERENCIA) as date),0,1,0);
+      end
+   end else begin
+      O_DT_VENCIMENTO = INCDATE(cast(extract(month from :I_DT_REFERENCIA)
+                        ||'/'||:V_NR_DIAVENCIMENTO||'/'||extract(year from :I_DT_REFERENCIA) as date),0,1,0);
+   end
+
+   --[ Busca um dia para a data de vencimento ]--
+   execute procedure RETORNA_DIAUTIL(:O_DT_VENCIMENTO,:V_TP_VENCIMENTO)
+                    returning_values(:O_DT_VENCIMENTO);
+
+   --[ Calcula os Juros e Multa se a Data de Vencimento for Diferente da Data de Vencimento Original ]--
+   O_DT_NORMAL = :O_DT_VENCIMENTO;
+   O_VL_TOTAL  = coalesce(:O_VL_IMPOSTO,0);
+   O_VL_JUROS  = 0;
+   O_VL_MULTA  = 0;
+   if (coalesce(:I_DT_VENCIMENTO,:O_DT_VENCIMENTO) > :O_DT_VENCIMENTO) then begin
+      select CLJ.O_VL_JUROS, CLJ.O_VL_MULTA
+      from   CALCULA_JUROSMULTA(:V_CD_IMPOSTO,:O_DT_VENCIMENTO,:I_DT_VENCIMENTO,:O_VL_IMPOSTO) CLJ
+      into   :O_VL_JUROS, :O_VL_MULTA;
+
+      O_VL_TOTAL = :O_VL_TOTAL + coalesce(:O_VL_JUROS,0) + coalesce(:O_VL_MULTA,0);
+      O_DT_VENCIMENTO = :I_DT_VENCIMENTO;
+   end
+
+   --[ Retorna mensagem de Erro caso não deve ser Gerado a Guia ]--
+   if (:V_VL_NOTA is null) then
+      O_DS_MENSAGEM = 'Não existe movimentação no período informado !';
+   else if (O_VL_IMPOSTO = 0) then
+      O_DS_MENSAGEM = 'O valor da Guia de Imposto é 0,00';
+   else if (O_VL_IMPOSTO < :V_VL_MINIMO) then
+      O_DS_MENSAGEM = 'O valor da Guia de Imposto é '||:O_VL_IMPOSTO||' que é menor que o valor mínimo permitido de '||:V_VL_MINIMO;
+
+   --[ Registra os dados da Impressão da Guia de Imposto ]--
+   if (:V_VL_NOTA is not null) then begin
+      update RELFATURAMENTO R
+      set    NR_MESREFERENCIA    = extract(month from :I_DT_REFERENCIA),
+             DS_OBSERVACAO       = '',
+             VL_CUPOM            = coalesce(:V_VL_CUPOMFISCAL,0),
+             VL_OUTRASRECEITAS   = :I_VL_OUTRASRECEITAS,
+             VL_RECEITABRUTA     = coalesce(coalesce(nullif(:O_VL_RBRUTA,0),:V_VL_NOTA),0),
+             PC_IMPOSTO          = cast(:O_PC_ALIQUOTA as numeric(3,2)),
+             DT_VENCIMENTO       = :O_DT_VENCIMENTO,
+             VL_IMPOSTO          = :O_VL_IMPOSTO,
+             VL_SERVICOS         = :V_VL_NFSERVICO,
+             VL_DEVOLUCAO        = :V_VL_DEVOLUCAO,
+             VL_DEVBRUTA         = :V_VL_DEVBRUTA,
+             VL_VENDA            = (:V_VL_NOTA - coalesce(:I_VL_OUTRASRECEITAS,0) - coalesce(:V_VL_NFSERVICO,0)),
+             PC_SERVICOFAT       = cast(coalesce(:V_PC_RSERVICO,0) as numeric(3,2)),
+             VL_RETENCAO         = coalesce(:V_VL_IMPRETIDO,0),
+             DT_INICIAL          = :V_DT_INICIAL,
+             VL_JUROS            = :O_VL_JUROS,
+             VL_MULTA            = :O_VL_MULTA,
+             DT_REGISTRO         = 'NOW'
+      where  R.CD_EMPRESA        = :I_CD_EMPRESA
+      and    R.CD_EMPRCODRECEITA = :I_CD_EMPRESA
+      and    R.CD_CODRECEITA     = :I_CD_CODRECEITA
+      and    R.DT_APURACAO       = :I_DT_REFERENCIA;
+
+      if (row_count = 0) then begin
+         insert into RELFATURAMENTO(CD_EMPRESA,  CD_EMPRCODRECEITA, CD_CODRECEITA, VL_CUPOM, PC_SERVICOFAT,
+                                    DT_APURACAO, NR_MESREFERENCIA,  DS_OBSERVACAO, VL_VENDA, VL_RETENCAO,
+                                    VL_OUTRASRECEITAS, VL_RECEITABRUTA, PC_IMPOSTO, VL_DEVBRUTA, DT_INICIAL,
+                                    DT_VENCIMENTO, VL_IMPOSTO, VL_SERVICOS, VL_DEVOLUCAO, VL_JUROS, VL_MULTA, DT_REGISTRO)
+                             values(:I_CD_EMPRESA,    :I_CD_EMPRESA, :I_CD_CODRECEITA,  coalesce(:V_VL_CUPOMFISCAL,0), cast(coalesce(:V_PC_RSERVICO,0) as numeric(3,2)),
+                                    :I_DT_REFERENCIA, extract(month from :I_DT_REFERENCIA), '', (:V_VL_NOTA - coalesce(:I_VL_OUTRASRECEITAS,0) - coalesce(:V_VL_NFSERVICO,0)),
+                                    coalesce(:V_VL_IMPRETIDO,0), :I_VL_OUTRASRECEITAS, coalesce(coalesce(nullif(:O_VL_RBRUTA,0),:V_VL_NOTA),0), cast(:O_PC_ALIQUOTA as numeric(3,2)), :V_VL_DEVBRUTA, :V_DT_INICIAL,
+                                    :O_DT_VENCIMENTO, :O_VL_IMPOSTO, :V_VL_NFSERVICO, :V_VL_DEVOLUCAO,:O_VL_JUROS, :O_VL_MULTA, 'NOW');
+      end
+   --[ Caso não Exista Movimento Limpa os Dados da Relação de Faturamento ]--
+   end else begin
+      delete from RELFATURAMENTO R
+      where  R.CD_EMPRESA        = :I_CD_EMPRESA
+      and    R.CD_EMPRCODRECEITA = :I_CD_EMPRESA
+      and    R.CD_CODRECEITA     = :I_CD_CODRECEITA
+      and    R.DT_APURACAO       = :I_DT_REFERENCIA;
+   end
+
+   suspend;
+end^
+
+SET TERM ; ^
+
