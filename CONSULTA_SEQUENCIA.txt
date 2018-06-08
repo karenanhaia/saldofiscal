@@ -1,0 +1,69 @@
+SET TERM ^ ;
+
+CREATE OR ALTER PROCEDURE CONSULTA_SEQUENCIA (
+    V_CD_EMPRESA INTEGER,
+    V_NM_SEQUENCIA VARCHAR(60))
+RETURNS (
+    V_NR_SEQUENCIA BIGINT,
+    V_DS_MENSAGEM VARCHAR(2000))
+AS
+DECLARE VARIABLE I_NM_SEQUENCIA VARCHAR(60);
+DECLARE VARIABLE I_NM_GENERATOR VARCHAR(60);
+DECLARE VARIABLE I_NR_ATUAL BIGINT;
+DECLARE VARIABLE I_NR_MAXIMO BIGINT;
+DECLARE VARIABLE I_COMANDO VARCHAR(2000);
+DECLARE VARIABLE I_NR_SEQ BIGINT;
+begin
+   if ( V_CD_EMPRESA is not null ) then
+      -- Monta o Nome da Sequencia de Acordo com a Empresa
+      I_NM_SEQUENCIA = 'SEQ' || TRIM(STRREPEAT('0',4-STRLEN(V_CD_EMPRESA))||V_CD_EMPRESA) ||
+                       SUBSTR(V_NM_SEQUENCIA,STRPOS('_',V_NM_SEQUENCIA),STRLEN(V_NM_SEQUENCIA));
+   else
+      I_NM_SEQUENCIA = V_NM_SEQUENCIA;
+
+   I_NM_GENERATOR = null;
+   -- Verifica se é uma Sequencia de Banco
+   SELECT G.RDB$GENERATOR_NAME
+   FROM RDB$GENERATORS G
+   WHERE G.RDB$GENERATOR_NAME = :I_NM_SEQUENCIA
+   INTO :I_NM_GENERATOR;
+
+   if ( I_NM_GENERATOR is not null ) then
+   begin
+      -- Monta o Comando para Gerar a Sequencia
+      I_COMANDO = 'select CAST(GEN_ID('||I_NM_SEQUENCIA||', 1) AS BIGINT) from RDB$DATABASE;';
+      -- Incrementa a Sequencia de Banco
+      Execute Statement :I_COMANDO into :V_NR_SEQUENCIA;
+
+      I_COMANDO = 'ALTER SEQUENCE '||I_NM_SEQUENCIA||' RESTART WITH '||(V_NR_SEQUENCIA - 1)||' ;';
+      Execute Statement :I_COMANDO;
+   end
+   else begin
+      SELECT S.NM_SEQUENCIA, S.NR_ATUAL, S.NR_MAXIMO
+      FROM SEQUENCIA S
+      WHERE S.NM_SEQUENCIA = :V_NM_SEQUENCIA
+        AND COALESCE(S.CD_EMPRESA,0) = COALESCE(:V_CD_EMPRESA,0)
+      INTO :I_NM_GENERATOR, :I_NR_ATUAL, :I_NR_MAXIMO;
+      if ( I_NM_GENERATOR is null ) then begin
+         V_DS_MENSAGEM = 'A Sequência '||V_NM_SEQUENCIA||' não está Cadastrada. Verifique!';
+         suspend;
+         exit;
+      end
+      if ( (coalesce(I_NR_ATUAL,0) + 1) > I_NR_MAXIMO ) then begin
+         V_DS_MENSAGEM = 'A Sequência '||V_NM_SEQUENCIA||' Atingiu o Número Máximo. Verifique!';
+         suspend;
+         exit;
+      end
+      -- Incrementa o Numero de Sequencia
+      V_NR_SEQUENCIA = coalesce(I_NR_ATUAL,0) + 1;
+   end
+
+   suspend;
+--   when any do begin
+--      V_DS_MENSAGEM = '[ GERA_SEQUENCIA ] '||CHR(10)||CHR(10)||'Código SQL.: '||sqlcode||'   Código Erro.: '||gdscode;
+--      suspend;
+--   end
+end^
+
+SET TERM ; ^
+

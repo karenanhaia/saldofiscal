@@ -1,0 +1,28 @@
+SET TERM ^ ;
+
+CREATE OR ALTER TRIGGER TRGBUD_IMPOSTONOTACTB FOR IMPOSTONOTACTB
+ACTIVE BEFORE UPDATE OR DELETE POSITION 0
+as
+   declare variable V_DS_MENSAGEM varchar(2000);
+   declare variable V_CD_MODULO DOM_VARCHAR6;
+
+begin
+   SELECT S.CD_MODULO
+   FROM SESSAO S
+   WHERE S.NR_CONEXAO = CURRENT_CONNECTION
+   INTO :V_CD_MODULO;
+
+   if (V_CD_MODULO IS DISTINCT FROM 'MCB003') then
+   begin
+      --[ Retira o Saldo do Lançamento Antigo ]--
+      execute procedure RECALCULA_SALDOFISCAL(old.CD_EMPRESA,old.NR_LANCAMENTO,old.CD_SERIE,
+                                              old.TP_NOTA,old.TP_IMPOSTO,old.VL_IMPOSTO,'N',old.ST_RETIDO)
+      returning_values(V_DS_MENSAGEM);
+      
+      --[ Caso aconteça algum erro ]--
+      if (V_DS_MENSAGEM is not null) then
+         exception E_GERAL :V_DS_MENSAGEM;
+   end
+end^
+
+SET TERM ; ^

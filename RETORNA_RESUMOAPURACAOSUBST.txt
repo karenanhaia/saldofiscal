@@ -1,400 +1,378 @@
 SET TERM ^ ;
 
-CREATE OR ALTER procedure RETORNA_RESUMOAPURACAOSUBST (
-    I_CD_EMPRESA integer,
-    I_TP_IMPOSTO varchar(1),
-    I_DT_INICIAL date,
-    I_DT_FINAL date,
-    I_CD_ANOQUEBRA integer,
-    I_CD_MESQUEBRA integer,
-    I_SG_ESTADO varchar(2))
-returns (
-    O_VL_IMPSAIDA numeric(15,2),
-    O_VL_OUTROSDEB numeric(15,2),
-    O_VL_ESTORNOCRED numeric(15,2),
-    O_VL_TOTALDEBITO numeric(15,2),
-    O_VL_SALDOCREDANT numeric(15,2),
-    O_VL_IMPENTRADA numeric(15,2),
-    O_VL_OUTROSCRED numeric(15,2),
-    O_VL_ESTORNODEB numeric(15,2),
-    O_VL_TOTALCREDITO numeric(15,2),
-    O_VL_RECOLHER numeric(15,2),
-    O_VL_SALDOCREDOR numeric(15,2),
-    O_VL_DEVOLUCAO numeric(15,2),
-    O_VL_RETIDO numeric(15,2),
-    O_VL_DEDUCOES numeric(15,2))
-as
-declare variable V_ST_ESTADO varchar(1);
-declare variable V_CD_CODRECEITA integer;
-declare variable V_NR_MESATUAL integer;
-declare variable V_VL_PARCIAL numeric(15,2);
-declare variable V_VL_PARCIALD numeric(15,2);
-declare variable V_VL_PARCIALC numeric(15,2);
-declare variable V_DT_ATUAL date;
-declare variable V_ST_CENTRALIZADO varchar(1);
-declare variable V_ST_MATRIZ varchar(1);
-declare variable V_DT_INICIAL date;
-declare variable V_DT_FINAL date;
-begin
-   --[ Busca a Situação da Empresa no Estado ]--
-   select EMPRESA.ST_ESTADO, EMPRESA.ST_MATRIZ
-   from   EMPRESA
-   where  EMPRESA.CD_EMPRESA = :I_CD_EMPRESA
-   into   :V_ST_ESTADO, :V_ST_MATRIZ;
+CREATE OR ALTER PROCEDURE RETORNA_RESUMOAPURACAOSUBST (
+    I_CD_EMPRESA INTEGER,
+    I_TP_IMPOSTO VARCHAR(1),
+    I_DT_INICIAL DATE,
+    I_DT_FINAL DATE,
+    I_CD_ANOQUEBRA INTEGER,
+    I_CD_MESQUEBRA INTEGER,
+    I_SG_ESTADO VARCHAR(2))
+RETURNS (
+    O_VL_IMPSAIDA NUMERIC(15,2),
+    O_VL_OUTROSDEB NUMERIC(15,2),
+    O_VL_ESTORNOCRED NUMERIC(15,2),
+    O_VL_TOTALDEBITO NUMERIC(15,2),
+    O_VL_SALDOCREDANT NUMERIC(15,2),
+    O_VL_IMPENTRADA NUMERIC(15,2),
+    O_VL_OUTROSCRED NUMERIC(15,2),
+    O_VL_ESTORNODEB NUMERIC(15,2),
+    O_VL_TOTALCREDITO NUMERIC(15,2),
+    O_VL_RECOLHER NUMERIC(15,2),
+    O_VL_SALDOCREDOR NUMERIC(15,2),
+    O_VL_DEVOLUCAO NUMERIC(15,2),
+    O_VL_RETIDO NUMERIC(15,2),
+    O_VL_DEDUCOES NUMERIC(15,2))
+AS
+DECLARE VARIABLE V_ST_ESTADO VARCHAR(1);
+DECLARE VARIABLE V_CD_CODRECEITA INTEGER;
+DECLARE VARIABLE V_NR_MESATUAL INTEGER;
+DECLARE VARIABLE V_VL_PARCIAL NUMERIC(15,2);
+DECLARE VARIABLE V_VL_PARCIALD NUMERIC(15,2);
+DECLARE VARIABLE V_VL_PARCIALC NUMERIC(15,2);
+DECLARE VARIABLE V_DT_ATUAL DATE;
+DECLARE VARIABLE V_ST_CENTRALIZADO VARCHAR(1);
+DECLARE VARIABLE V_ST_MATRIZ VARCHAR(1);
+DECLARE VARIABLE V_DT_INICIAL DATE;
+DECLARE VARIABLE V_DT_FINAL DATE;
+BEGIN
+    --[ Busca a Situação da Empresa no Estado ]--
+    SELECT EMPRESA.ST_ESTADO, EMPRESA.ST_MATRIZ
+    FROM EMPRESA
+    WHERE EMPRESA.CD_EMPRESA = :I_CD_EMPRESA
+    INTO :V_ST_ESTADO, :V_ST_MATRIZ;
 
-   --[ Verifica se o ICMS ?entralizado ]--
-   select P.ST_ICMSCENTRALIZADO
-   from   PARMFISCAL P
-   where  P.CD_EMPRESA = :I_CD_EMPRESA
-   into   :V_ST_CENTRALIZADO;
+    --[ Verifica se o ICMS ?entralizado ]--
+    SELECT P.ST_ICMSCENTRALIZADO
+    FROM PARMFISCAL P
+    WHERE P.CD_EMPRESA = :I_CD_EMPRESA
+    INTO :V_ST_CENTRALIZADO;
 
---   exception e_geral 'ST_MATRIZ: '||V_ST_MATRIZ;
---   exception e_geral 'ST_CENTRALIZADO: '||V_ST_CENTRALIZADO;
---   exception e_geral 'CD_MESQUEBRA: '||I_CD_MESQUEBRA;
+    --   exception e_geral 'ST_MATRIZ: '||V_ST_MATRIZ;
+    --   exception e_geral 'ST_CENTRALIZADO: '||V_ST_CENTRALIZADO;
+    --   exception e_geral 'CD_MESQUEBRA: '||I_CD_MESQUEBRA;
 
-   --[ Se o Estabelecimento ?entralizado e For a Filial o Resumo aparece Zerado ]--
-   if (((:V_ST_MATRIZ = 'N') and (:V_ST_CENTRALIZADO = 'S')) or (:I_CD_MESQUEBRA is null)) then begin
-      O_VL_IMPSAIDA     = 0;
-      O_VL_OUTROSDEB    = 0;
-      O_VL_ESTORNOCRED  = 0;
-      O_VL_TOTALDEBITO  = 0;
-      O_VL_SALDOCREDANT = 0;
-      O_VL_IMPENTRADA   = 0;
-      O_VL_OUTROSCRED   = 0;
-      O_VL_ESTORNODEB   = 0;
-      O_VL_TOTALCREDITO = 0;
-      O_VL_RECOLHER     = 0;
-      O_VL_SALDOCREDOR  = 0;
-   end else begin
-      if (:I_CD_MESQUEBRA <> 20) then begin
-         --[ Encontra a Data Inicial se o Relatorio ?e Mais de Um ano ]--
-         if (:I_CD_ANOQUEBRA = extract(year from :I_DT_INICIAL)) then
-            V_DT_INICIAL = :I_DT_INICIAL;
-         else
-            V_DT_INICIAL = cast('01/01/'||:I_CD_ANOQUEBRA as date);
-      
-         --[ Encontra a Data Final se o Relatorio ?e Mais de Um ano ]--
-         if (:I_CD_ANOQUEBRA = extract(year from :I_DT_FINAL)) then
-            V_DT_FINAL = :I_DT_FINAL;
-         else
-            V_DT_FINAL = cast('12/31/'||:I_CD_ANOQUEBRA as date);
+    --[ Se o Estabelecimento ?entralizado e For a Filial o Resumo aparece Zerado ]--
+    IF (((:V_ST_MATRIZ = 'N') AND
+        (:V_ST_CENTRALIZADO = 'S')) OR (:I_CD_MESQUEBRA IS NULL)) THEN
+    BEGIN
+        O_VL_IMPSAIDA = 0;
+        O_VL_OUTROSDEB = 0;
+        O_VL_ESTORNOCRED = 0;
+        O_VL_TOTALDEBITO = 0;
+        O_VL_SALDOCREDANT = 0;
+        O_VL_IMPENTRADA = 0;
+        O_VL_OUTROSCRED = 0;
+        O_VL_ESTORNODEB = 0;
+        O_VL_TOTALCREDITO = 0;
+        O_VL_RECOLHER = 0;
+        O_VL_SALDOCREDOR = 0;
+    END
+    ELSE
+    BEGIN
+        IF (:I_CD_MESQUEBRA <> 20) THEN
+        BEGIN
+            --[ Encontra a Data Inicial se o Relatorio ?e Mais de Um ano ]--
+            IF (:I_CD_ANOQUEBRA = EXTRACT(YEAR FROM :I_DT_INICIAL)) THEN
+                V_DT_INICIAL = :I_DT_INICIAL;
+            ELSE
+                V_DT_INICIAL = CAST('01/01/' || :I_CD_ANOQUEBRA AS DATE);
 
-         select R.O_DT_INICIAL, R.O_DT_FINAL
-         from   RETORNA_INTERVALODATA(:V_DT_INICIAL,:V_DT_FINAL,:I_CD_MESQUEBRA,'M') R
-         into   :V_DT_INICIAL, :V_DT_FINAL;
+            --[ Encontra a Data Final se o Relatorio ?e Mais de Um ano ]--
+            IF (:I_CD_ANOQUEBRA = EXTRACT(YEAR FROM :I_DT_FINAL)) THEN
+                V_DT_FINAL = :I_DT_FINAL;
+            ELSE
+                V_DT_FINAL = CAST('12/31/' || :I_CD_ANOQUEBRA AS DATE);
 
+            SELECT R.O_DT_INICIAL, R.O_DT_FINAL
+            FROM RETORNA_INTERVALODATA(:V_DT_INICIAL, :V_DT_FINAL, :I_CD_MESQUEBRA, 'M') R
+            INTO :V_DT_INICIAL, :V_DT_FINAL;
 
-        --[ Encontra o Valor das Entradas e Saídas nos Saldos ]--
-        V_VL_PARCIALD = 0;
-        V_VL_PARCIALC = 0;
+            --[ Encontra o Valor das Entradas e Saídas nos Saldos ]--
+            V_VL_PARCIALD = 0;
+            V_VL_PARCIALC = 0;
 
-        select sum(VL_SUBSTRIB)
-        from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                              ' AND N.DT_EMISSAO BETWEEN '''||:V_DT_INICIAL||''' AND '''||:V_DT_FINAL||'''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' /*AND N.TP_NOTA = ''E''*/ AND (N.TP_NOTA = ''E'') AND (IT.ST_DEVOLUCAO = ''N'')  AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                              '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ',
-                              ' AND 1=2 ') V INTO :V_VL_PARCIALC;
+            SELECT SUM(VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO BETWEEN ''' || :V_DT_INICIAL || ''' AND ''' || :V_DT_FINAL || '''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' /*AND N.TP_NOTA = ''E''*/ AND (N.TP_NOTA = ''E'') AND (IT.ST_DEVOLUCAO = ''N'')  AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ', ' AND 1=2 ') V
+            INTO :V_VL_PARCIALC;
 
-        select sum(VL_SUBSTRIB)
-        from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                              ' AND N.DT_EMISSAO BETWEEN '''||:V_DT_INICIAL||''' AND '''||:V_DT_FINAL||'''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''S'' AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                              '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ',
-                              ' AND 1=2 ') V INTO :V_VL_PARCIALD;
+            SELECT SUM(VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO BETWEEN ''' || :V_DT_INICIAL || ''' AND ''' || :V_DT_FINAL || '''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''S'' AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ', ' AND 1=2 ') V
+            INTO :V_VL_PARCIALD;
 
-        O_VL_IMPSAIDA   = coalesce(:O_VL_IMPSAIDA  ,0) + coalesce(:V_VL_PARCIALD,0);
-        O_VL_IMPENTRADA = coalesce(:O_VL_IMPENTRADA,0) + coalesce(:V_VL_PARCIALC,0);
+            O_VL_IMPSAIDA = COALESCE(:O_VL_IMPSAIDA, 0) + COALESCE(:V_VL_PARCIALD, 0);
+            O_VL_IMPENTRADA = COALESCE(:O_VL_IMPENTRADA, 0) + COALESCE(:V_VL_PARCIALC, 0);
 
-         --[ Outros D?tos ]--
-         select sum(M.VL_DOCUMENTO)
-         from   MOVTOFISCAL M
-         left join retorna_dadoscadastrais(M.cd_pessoa,null) d on (1=1)
-         where  d.sg_estado = :i_sg_estado
-         and  M.CD_EMPRESA = :I_CD_EMPRESA
-         and    M.TP_IMPOSTO = 'T'
-         and    M.TP_MOVTOFISCAL = 'O'
-         and    M.ST_MOVTOFISCAL = 'D'
-         and    M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
-         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
-         into   :O_VL_OUTROSDEB;
+            --[ Outros D?tos ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'O'
+              AND M.ST_MOVTOFISCAL = 'D'
+              AND M.DT_LANCAMENTO BETWEEN :V_DT_INICIAL AND :V_DT_FINAL
+              AND EXTRACT(MONTH FROM M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+            INTO :O_VL_OUTROSDEB;
 
-         --[ Estorno de Cr?tos ]--
-         select sum(M.VL_DOCUMENTO)
-         from MOVTOFISCAL M
-         left join retorna_dadoscadastrais(M.cd_pessoa,null) d on (1=1)
-         where  d.sg_estado = :i_sg_estado
-         and   M.CD_EMPRESA     = :I_CD_EMPRESA
-         and   M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
-         and   M.TP_IMPOSTO     = 'T'
-         and   M.TP_MOVTOFISCAL = 'E'
-         and   M.ST_MOVTOFISCAL = 'C'
-         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
-         into  :O_VL_ESTORNOCRED;
+            --[ Estorno de Cr?tos ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.DT_LANCAMENTO BETWEEN :V_DT_INICIAL AND :V_DT_FINAL
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'E'
+              AND M.ST_MOVTOFISCAL = 'C'
+              AND EXTRACT(MONTH FROM M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+            INTO :O_VL_ESTORNOCRED;
 
-         --[ Se nao encontrou valor de Imposto, soma os Lancamentos Avulsos ]--
-         if (coalesce(:O_VL_IMPSAIDA,0) = 0) then
-            O_VL_IMPSAIDA = coalesce(:O_VL_OUTROSDEB,0) + coalesce(:O_VL_ESTORNOCRED,0);
+            --[ Se nao encontrou valor de Imposto, soma os Lancamentos Avulsos ]--
+            IF (COALESCE(:O_VL_IMPSAIDA, 0) = 0) THEN
+                O_VL_IMPSAIDA = COALESCE(:O_VL_OUTROSDEB, 0) + COALESCE(:O_VL_ESTORNOCRED, 0);
 
-         --[ Outros Cr?tos ]--
-         select sum(M.VL_DOCUMENTO)
-         from MOVTOFISCAL M
-         left join retorna_dadoscadastrais(M.cd_pessoa,null) d on (1=1)
-         where  d.sg_estado = :i_sg_estado
-         and   M.CD_EMPRESA     = :I_CD_EMPRESA
-         and   M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
-         and   M.TP_IMPOSTO     = 'T'
-         and   M.TP_MOVTOFISCAL = 'O'
-         and   M.ST_MOVTOFISCAL = 'C'
-         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
-         into  :O_VL_OUTROSCRED;
+            --[ Outros Cr?tos ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.DT_LANCAMENTO BETWEEN :V_DT_INICIAL AND :V_DT_FINAL
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'O'
+              AND M.ST_MOVTOFISCAL = 'C'
+              AND EXTRACT(MONTH FROM M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+            INTO :O_VL_OUTROSCRED;
 
-         --[ Imposto Retido ]--
-         select sum(IR.VL_SUBSTRIB)
-         from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                                 ' AND N.DT_EMISSAO BETWEEN '''||:V_DT_INICIAL||''' AND '''||:V_DT_FINAL||''' '||
-                                 ' AND IT.TP_NOTA   = ''S''  AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                                 ' AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 AND IP.ST_RETIDO = ''S'' ',
-                                 ' AND N.CD_EMPRESA = -1 AND 1 = 2 ') IR
-         where extract(month from IR.DT_EMISSAO) = :I_CD_MESQUEBRA
-         into  :O_VL_RETIDO;
+            --[ Imposto Retido ]--
+            SELECT SUM(IR.VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO BETWEEN ''' || :V_DT_INICIAL || ''' AND ''' || :V_DT_FINAL || ''' ' || ' AND IT.TP_NOTA   = ''S''  AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', ' AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 AND IP.ST_RETIDO = ''S'' ', ' AND N.CD_EMPRESA = -1 AND 1 = 2 ') IR
+            WHERE EXTRACT(MONTH FROM IR.DT_EMISSAO) = :I_CD_MESQUEBRA
+            INTO :O_VL_RETIDO;
 
-         --[ Estorno de D?tos ]--
-         select sum(M.VL_DOCUMENTO)
-         from MOVTOFISCAL M
-         left join retorna_dadoscadastrais(M.cd_pessoa,null) d on (1=1)
-         where  d.sg_estado = :i_sg_estado
-         and   M.CD_EMPRESA     = :I_CD_EMPRESA
-         and   M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
-         and   M.TP_IMPOSTO     = 'T'
-         and   M.TP_MOVTOFISCAL = 'E'
-         and   M.ST_MOVTOFISCAL = 'D'
-         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
-         into  :O_VL_ESTORNODEB;
+            --[ Estorno de D?tos ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.DT_LANCAMENTO BETWEEN :V_DT_INICIAL AND :V_DT_FINAL
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'E'
+              AND M.ST_MOVTOFISCAL = 'D'
+              AND EXTRACT(MONTH FROM M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+            INTO :O_VL_ESTORNODEB;
 
-         --[ Dedu?s ]--
-         select sum(M.VL_DOCUMENTO)
-         from MOVTOFISCAL M
-         INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA
-                                 AND C.CD_CODRECEITA = M.CD_CODRECEITA)
-         where  C.sg_estado = :i_sg_estado
-         and   M.CD_EMPRESA     = :I_CD_EMPRESA
-         and   M.DT_LANCAMENTO between :V_DT_INICIAL and :V_DT_FINAL
-         and   M.TP_IMPOSTO     = 'T'
-         and   M.TP_MOVTOFISCAL = 'O'
-         and   M.ST_MOVTOFISCAL = 'E'
-         and    extract(month from M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
-         into  :O_VL_DEDUCOES;
+            --[ Dedu?s ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.DT_LANCAMENTO BETWEEN :V_DT_INICIAL AND :V_DT_FINAL
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'O'
+              AND M.ST_MOVTOFISCAL = 'E'
+              AND EXTRACT(MONTH FROM M.DT_LANCAMENTO) = :I_CD_MESQUEBRA
+            INTO :O_VL_DEDUCOES;
 
-         --[ Saldo Credor Anterior ]--
-        V_VL_PARCIALD = 0;
-        V_VL_PARCIALC = 0;
+            --[ Saldo Credor Anterior ]--
+            V_VL_PARCIALD = 0;
+            V_VL_PARCIALC = 0;
 
-        select sum(VL_SUBSTRIB)
-        from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                              ' AND N.DT_EMISSAO < '''||:V_DT_INICIAL||''' AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''E'' AND (IT.ST_DEVOLUCAO = ''N'')  AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                              '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ',
-                              ' AND 1=2 ') V INTO :V_VL_PARCIALC;
-        select sum(VL_SUBSTRIB)
-        from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                              ' AND N.DT_EMISSAO < '''||:V_DT_INICIAL||''' AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''S'' AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                              '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ',
-                              ' AND 1=2 ') V INTO :V_VL_PARCIALD;
+            SELECT SUM(VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO < ''' || :V_DT_INICIAL || ''' AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''E'' AND (IT.ST_DEVOLUCAO = ''N'')  AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ', ' AND 1=2 ') V
+            INTO :V_VL_PARCIALC;
+            SELECT SUM(VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO < ''' || :V_DT_INICIAL || ''' AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''S'' AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ', ' AND 1=2 ') V
+            INTO :V_VL_PARCIALD;
 
-         O_VL_SALDOCREDANT = ((V_VL_PARCIALD - V_VL_PARCIALC)* -1);
+            O_VL_SALDOCREDANT = ((V_VL_PARCIALD - V_VL_PARCIALC) * -1);
 
-         if (:O_VL_SALDOCREDANT < 0) then
-            O_VL_SALDOCREDANT = 0;
+            IF (:O_VL_SALDOCREDANT < 0) THEN
+                O_VL_SALDOCREDANT = 0;
 
-         --[ Quando não tem cr?to nas compras ]--
-         if (coalesce(:O_VL_IMPENTRADA,0) = 0) then
-            O_VL_IMPENTRADA = coalesce(:O_VL_OUTROSCRED,0) + coalesce(:O_VL_ESTORNODEB,0) + coalesce(:O_VL_RETIDO,0);
+            --[ Quando não tem cr?to nas compras ]--
+            IF (COALESCE(:O_VL_IMPENTRADA, 0) = 0) THEN
+                O_VL_IMPENTRADA = COALESCE(:O_VL_OUTROSCRED, 0) + COALESCE(:O_VL_ESTORNODEB, 0) + COALESCE(:O_VL_RETIDO, 0);
 
-         --[ Total de D?tos ]--
-         O_VL_TOTALDEBITO = coalesce(:O_VL_IMPSAIDA,0);
-         O_VL_IMPSAIDA    = coalesce(:O_VL_IMPSAIDA,0) + coalesce(:O_VL_OUTROSDEB,0) - coalesce(:O_VL_ESTORNOCRED,0);
+            --[ Total de D?tos ]--
+            O_VL_TOTALDEBITO = COALESCE(:O_VL_IMPSAIDA, 0);
+            O_VL_IMPSAIDA = COALESCE(:O_VL_IMPSAIDA, 0) + COALESCE(:O_VL_OUTROSDEB, 0) - COALESCE(:O_VL_ESTORNOCRED, 0);
 
-         --[ Total de Cr?tos ]--
-         O_VL_TOTALCREDITO = coalesce(:O_VL_IMPENTRADA,0) + coalesce(:O_VL_SALDOCREDANT,0);
-         O_VL_IMPENTRADA   = coalesce(:O_VL_IMPENTRADA,0) - coalesce(:O_VL_OUTROSCRED,0) -
-                             coalesce(:O_VL_ESTORNODEB,0) - coalesce(:O_VL_RETIDO,0);
+            --[ Total de Cr?tos ]--
+            O_VL_TOTALCREDITO = COALESCE(:O_VL_IMPENTRADA, 0) + COALESCE(:O_VL_SALDOCREDANT, 0);
+            O_VL_IMPENTRADA = COALESCE(:O_VL_IMPENTRADA, 0) - COALESCE(:O_VL_OUTROSCRED, 0) - COALESCE(:O_VL_ESTORNODEB, 0) - COALESCE(:O_VL_RETIDO, 0);
 
-         --[ Imposto a Recolher ou Imposto Credor ]--
-         if ((:O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO) > 0) then begin
-            O_VL_RECOLHER = :O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO;
-            O_VL_SALDOCREDOR = 0;
-         end else begin
-            O_VL_RECOLHER = 0;
-            O_VL_SALDOCREDOR = :O_VL_TOTALCREDITO - :O_VL_TOTALDEBITO;
-         end
+            --[ Imposto a Recolher ou Imposto Credor ]--
+            IF ((:O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO) > 0) THEN
+            BEGIN
+                O_VL_RECOLHER = :O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO;
+                O_VL_SALDOCREDOR = 0;
+            END
+            ELSE
+            BEGIN
+                O_VL_RECOLHER = 0;
+                O_VL_SALDOCREDOR = :O_VL_TOTALCREDITO - :O_VL_TOTALDEBITO;
+            END
 
-         select sum(v.VL_SUBSTRIB)
-         from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                               ' AND N.DT_EMISSAO BETWEEN '''||:V_DT_INICIAL||''' AND '''||:V_DT_FINAL||'''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND ((N.TP_NOTA = ''E'') AND (IT.ST_DEVOLUCAO = ''D''))  AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                               '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 AND IT.CD_CFO IN (1410, 1411, 1414, 1415, 1660, 1661, 1662, 2410, 2411, 2414, 2415, 2660, 2661, 2662) ',
-                               ' AND 1=2 ') V
-         into :o_vl_devolucao;
+            SELECT SUM(V.VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO BETWEEN ''' || :V_DT_INICIAL || ''' AND ''' || :V_DT_FINAL || '''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND ((N.TP_NOTA = ''E'') AND (IT.ST_DEVOLUCAO = ''D''))  AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 AND IT.CD_CFO IN (1410, 1411, 1414, 1415, 1660, 1661, 1662, 2410, 2411, 2414, 2415, 2660, 2661, 2662) ', ' AND 1=2 ') V
+            INTO :O_VL_DEVOLUCAO;
 
+            --[ Não Efetuou a Quebra por Mês ]--
+        END
+        ELSE
+        BEGIN
 
-      --[ Não Efetuou a Quebra por Mês ]--
-      end else begin
+            --[ Encontra o Valor das Entradas e Saídas nos Saldos ]--
+            V_DT_ATUAL = LASTDAYMONTH(:I_DT_INICIAL);
+            V_VL_PARCIALD = 0;
+            V_VL_PARCIALC = 0;
+            WHILE (:V_DT_ATUAL <= LASTDAYMONTH(:I_DT_FINAL)) DO
+            BEGIN
+                SELECT SUM(VL_SUBSTRIB)
+                FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO BETWEEN ''' || :I_DT_INICIAL || ''' AND ''' || :I_DT_FINAL || '''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''E'' AND (IT.ST_DEVOLUCAO = ''N'') AND  N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ', ' AND 1=2 ') V
+                INTO :V_VL_PARCIALC;
+                SELECT SUM(VL_SUBSTRIB)
+                FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO BETWEEN ''' || :I_DT_INICIAL || ''' AND ''' || :I_DT_FINAL || '''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''S'' AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ', ' AND 1=2 ') V
+                INTO :V_VL_PARCIALD;
 
-        --[ Encontra o Valor das Entradas e Saídas nos Saldos ]--
-        V_DT_ATUAL = LASTDAYMONTH(:I_DT_INICIAL);
-        V_VL_PARCIALD = 0;
-        V_VL_PARCIALC = 0;
-        while (:V_DT_ATUAL <= LASTDAYMONTH(:I_DT_FINAL)) do begin
-            select sum(VL_SUBSTRIB)
-            from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                                  ' AND N.DT_EMISSAO BETWEEN '''||:I_DT_INICIAL||''' AND '''||:I_DT_FINAL||'''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''E'' AND (IT.ST_DEVOLUCAO = ''N'') AND  N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                                  '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ',
-                                  ' AND 1=2 ') V INTO :V_VL_PARCIALC;
-            select sum(VL_SUBSTRIB)
-            from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                                  ' AND N.DT_EMISSAO BETWEEN '''||:I_DT_INICIAL||''' AND '''||:I_DT_FINAL||'''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''S'' AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                                  '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ',
-                                  ' AND 1=2 ') V INTO :V_VL_PARCIALD;
+                O_VL_IMPSAIDA = COALESCE(:O_VL_IMPSAIDA, 0) + COALESCE(:V_VL_PARCIALD, 0);
+                O_VL_IMPENTRADA = COALESCE(:O_VL_IMPENTRADA, 0) + COALESCE(:V_VL_PARCIALC, 0);
+                V_DT_ATUAL = LASTDAYMONTH(INCDATE(:V_DT_ATUAL, 0, 1, 0));
+            END
 
-           O_VL_IMPSAIDA   = coalesce(:O_VL_IMPSAIDA  ,0) + coalesce(:V_VL_PARCIALD,0);
-           O_VL_IMPENTRADA = coalesce(:O_VL_IMPENTRADA,0) + coalesce(:V_VL_PARCIALC,0);
-           V_DT_ATUAL = LASTDAYMONTH(INCDATE(:V_DT_ATUAL,0,1,0));
-        end
+            --[ Outros D?tos ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'O'
+              AND M.ST_MOVTOFISCAL = 'D'
+              AND M.DT_LANCAMENTO BETWEEN :I_DT_INICIAL AND :I_DT_FINAL
+            INTO :O_VL_OUTROSDEB;
 
-         --[ Outros D?tos ]--
-         select sum(M.VL_DOCUMENTO)
-         from   MOVTOFISCAL M
-         left join retorna_dadoscadastrais(M.cd_pessoa,null) d on (1=1)
-         where  d.sg_estado = :i_sg_estado
-         and    M.CD_EMPRESA = :I_CD_EMPRESA
-         and    M.TP_IMPOSTO = 'T'
-         and    M.TP_MOVTOFISCAL = 'O'
-         and    M.ST_MOVTOFISCAL = 'D'
-         and    M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
-         into   :O_VL_OUTROSDEB;
+            --[ Estorno de Cr?tos ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.DT_LANCAMENTO BETWEEN :I_DT_INICIAL AND :I_DT_FINAL
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'E'
+              AND M.ST_MOVTOFISCAL = 'C'
+            INTO :O_VL_ESTORNOCRED;
 
-         --[ Estorno de Cr?tos ]--
-         select sum(M.VL_DOCUMENTO)
-         from MOVTOFISCAL M
-         left join retorna_dadoscadastrais(M.cd_pessoa,null) d on (1=1)
-         where  d.sg_estado = :i_sg_estado
-         and   M.CD_EMPRESA     = :I_CD_EMPRESA
-         and   M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
-         and   M.TP_IMPOSTO     = 'T'
-         and   M.TP_MOVTOFISCAL = 'E'
-         and   M.ST_MOVTOFISCAL = 'C'
-         into  :O_VL_ESTORNOCRED;
+            --[ Outros Cr?tos ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.DT_LANCAMENTO BETWEEN :I_DT_INICIAL AND :I_DT_FINAL
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'O'
+              AND M.ST_MOVTOFISCAL = 'C'
+            INTO :O_VL_OUTROSCRED;
 
-         --[ Outros Cr?tos ]--
-         select sum(M.VL_DOCUMENTO)
-         from MOVTOFISCAL M
-         left join retorna_dadoscadastrais(M.cd_pessoa,null) d on (1=1)
-         where  d.sg_estado = :i_sg_estado
-         and   M.CD_EMPRESA     = :I_CD_EMPRESA
-         and   M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
-         and   M.TP_IMPOSTO     = 'T'
-         and   M.TP_MOVTOFISCAL = 'O'
-         and   M.ST_MOVTOFISCAL = 'C'
-         into  :O_VL_OUTROSCRED;
+            --[ Imposto Retido ]--
+            SELECT SUM(IR.VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO BETWEEN ''' || :I_DT_INICIAL || ''' AND ''' || :I_DT_FINAL || ''' ' || ' AND N.TP_NOTA    = ''S''  AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', ' AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 AND IP.ST_RETIDO = ''S'' ', ' AND N.CD_EMPRESA = -1 AND 1 = 2 ') IR
+            INTO :O_VL_RETIDO;
 
-         --[ Imposto Retido ]--
-         select sum(IR.VL_SUBSTRIB)
-         from   VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                                 ' AND N.DT_EMISSAO BETWEEN '''||:I_DT_INICIAL||''' AND '''||:I_DT_FINAL||''' '||
-                                 ' AND N.TP_NOTA    = ''S''  AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                                 ' AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 AND IP.ST_RETIDO = ''S'' ',
-                                 ' AND N.CD_EMPRESA = -1 AND 1 = 2 ') IR
-         into  :O_VL_RETIDO;
+            --[ Estorno de D?tos ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.DT_LANCAMENTO BETWEEN :I_DT_INICIAL AND :I_DT_FINAL
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'E'
+              AND M.ST_MOVTOFISCAL = 'D'
+            INTO :O_VL_ESTORNODEB;
 
-         --[ Estorno de D?tos ]--
-         select sum(M.VL_DOCUMENTO)
-         from MOVTOFISCAL M
-         left join retorna_dadoscadastrais(M.cd_pessoa,null) d on (1=1)
-         where  d.sg_estado = :i_sg_estado
-         and   M.CD_EMPRESA     = :I_CD_EMPRESA
-         and   M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
-         and   M.TP_IMPOSTO     = 'T'
-         and   M.TP_MOVTOFISCAL = 'E'
-         and   M.ST_MOVTOFISCAL = 'D'
-         into  :O_VL_ESTORNODEB;
+            --[ Dedu?s ]--
+            SELECT SUM(M.VL_DOCUMENTO)
+            FROM MOVTOFISCAL M
+            INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA AND C.CD_CODRECEITA = M.CD_CODRECEITA)
+            WHERE C.SG_ESTADO = :I_SG_ESTADO
+              AND M.CD_EMPRESA = :I_CD_EMPRESA
+              AND M.DT_LANCAMENTO BETWEEN :I_DT_INICIAL AND :I_DT_FINAL
+              AND M.TP_IMPOSTO = 'T'
+              AND M.TP_MOVTOFISCAL = 'O'
+              AND M.ST_MOVTOFISCAL = 'E'
+            INTO :O_VL_DEDUCOES;
 
-         --[ Dedu?s ]--
-         select sum(M.VL_DOCUMENTO)
-         from MOVTOFISCAL M
-         INNER JOIN CODRECEITA C ON (C.CD_EMPRESA = M.CD_EMPRESA
-                                 AND C.CD_CODRECEITA = M.CD_CODRECEITA)
-         where  C.sg_estado = :i_sg_estado
-         and   M.CD_EMPRESA     = :I_CD_EMPRESA
-         and   M.DT_LANCAMENTO between :I_DT_INICIAL and :I_DT_FINAL
-         and   M.TP_IMPOSTO     = 'T'
-         and   M.TP_MOVTOFISCAL = 'O'
-         and   M.ST_MOVTOFISCAL = 'E'
-         into  :O_VL_DEDUCOES;
+            --[ Se nao encontrou valor de Imposto, soma os Lancamentos Avulsos ]--
+            IF (COALESCE(:O_VL_IMPSAIDA, 0) = 0) THEN
+                O_VL_IMPSAIDA = COALESCE(:O_VL_OUTROSDEB, 0) + COALESCE(:O_VL_ESTORNOCRED, 0);
 
-         --[ Se nao encontrou valor de Imposto, soma os Lancamentos Avulsos ]--
-         if (coalesce(:O_VL_IMPSAIDA,0) = 0) then
-            O_VL_IMPSAIDA = coalesce(:O_VL_OUTROSDEB,0) + coalesce(:O_VL_ESTORNOCRED,0);
+            --[ Saldo Credor Anterior ]--
+            V_VL_PARCIALD = 0;
+            V_VL_PARCIALC = 0;
 
-         --[ Saldo Credor Anterior ]--
-        V_VL_PARCIALD = 0;
-        V_VL_PARCIALC = 0;
+            SELECT SUM(VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO < ''' || :I_DT_INICIAL || ''' AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''E'' AND (IT.ST_DEVOLUCAO = ''N'') AND  N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ', ' AND 1=2 ') V
+            INTO :V_VL_PARCIALC;
+            SELECT SUM(VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO < ''' || :I_DT_INICIAL || ''' AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''S'' AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ', ' AND 1=2 ') V
+            INTO :V_VL_PARCIALD;
 
-        select sum(VL_SUBSTRIB)
-        from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                              ' AND N.DT_EMISSAO < '''||:I_DT_INICIAL||''' AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''E'' AND (IT.ST_DEVOLUCAO = ''N'') AND  N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                              '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ',
-                              ' AND 1=2 ') V INTO :V_VL_PARCIALC;
-        select sum(VL_SUBSTRIB)
-        from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                              ' AND N.DT_EMISSAO < '''||:I_DT_INICIAL||''' AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND N.TP_NOTA = ''S'' AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                              '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 ',
-                              ' AND 1=2 ') V INTO :V_VL_PARCIALD;
+            O_VL_SALDOCREDANT = ((V_VL_PARCIALD - V_VL_PARCIALC) * -1);
 
-         O_VL_SALDOCREDANT = ((V_VL_PARCIALD - V_VL_PARCIALC)* -1);
+            IF (:O_VL_SALDOCREDANT < 0) THEN
+                O_VL_SALDOCREDANT = 0;
 
-         if (:O_VL_SALDOCREDANT < 0) then
-            O_VL_SALDOCREDANT = 0;
+            --[ Quando não tem cr?to nas compras ]--
+            IF (COALESCE(:O_VL_IMPENTRADA, 0) = 0) THEN
+                O_VL_IMPENTRADA = COALESCE(:O_VL_OUTROSCRED, 0) + COALESCE(:O_VL_ESTORNODEB, 0) + COALESCE(:O_VL_RETIDO, 0);
 
-         --[ Quando não tem cr?to nas compras ]--
-         if (coalesce(:O_VL_IMPENTRADA,0) = 0) then
-            O_VL_IMPENTRADA = coalesce(:O_VL_OUTROSCRED,0) + coalesce(:O_VL_ESTORNODEB,0) + coalesce(:O_VL_RETIDO,0);
+            --[ Total de D?tos ]--
+            O_VL_TOTALDEBITO = COALESCE(:O_VL_IMPSAIDA, 0);
+            O_VL_IMPSAIDA = COALESCE(:O_VL_IMPSAIDA, 0) - COALESCE(:O_VL_OUTROSDEB, 0) - COALESCE(:O_VL_ESTORNOCRED, 0);
 
-         --[ Total de D?tos ]--
-         O_VL_TOTALDEBITO = coalesce(:O_VL_IMPSAIDA,0);
-         O_VL_IMPSAIDA    = coalesce(:O_VL_IMPSAIDA,0) - coalesce(:O_VL_OUTROSDEB,0) - coalesce(:O_VL_ESTORNOCRED,0);
+            --[ Total de Cr?tos ]--
+            O_VL_TOTALCREDITO = COALESCE(:O_VL_IMPENTRADA, 0) + COALESCE(:O_VL_SALDOCREDANT, 0);
+            O_VL_IMPENTRADA = COALESCE(:O_VL_IMPENTRADA, 0) - COALESCE(:O_VL_OUTROSCRED, 0) - COALESCE(:O_VL_ESTORNODEB, 0) - COALESCE(:O_VL_RETIDO, 0);
 
-         --[ Total de Cr?tos ]--
-         O_VL_TOTALCREDITO = coalesce(:O_VL_IMPENTRADA,0) + coalesce(:O_VL_SALDOCREDANT,0);
-         O_VL_IMPENTRADA   = coalesce(:O_VL_IMPENTRADA,0) - coalesce(:O_VL_OUTROSCRED,0) -
-                             coalesce(:O_VL_ESTORNODEB,0) - coalesce(:O_VL_RETIDO,0);
-
-         --[ Imposto a Recolher ou Imposto Credor ]--
-         if ((:O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO) > 0) then begin
-            O_VL_RECOLHER = :O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO;
-            O_VL_SALDOCREDOR = 0;
-         end else begin
-            O_VL_RECOLHER = 0;
-            O_VL_SALDOCREDOR = :O_VL_TOTALCREDITO - :O_VL_TOTALDEBITO;
-         end
-         select sum(v.VL_SUBSTRIB)
-         from VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = '||:I_CD_EMPRESA||
-                               ' AND N.DT_EMISSAO BETWEEN '''||:I_DT_INICIAL||''' AND '''||:I_DT_FINAL||'''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND ((N.TP_NOTA = ''E'') AND (IT.ST_DEVOLUCAO = ''D''))  AND N.SG_ESTADO = '''||:I_SG_ESTADO||'''',
-                               '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 AND IT.CD_CFO IN (1410, 1411, 1414, 1415, 1660, 1661, 1662, 2410, 2411, 2414, 2415, 2660, 2661, 2662) ',
-                               ' AND 1=2 ') V
-         into :o_vl_devolucao;
-         o_vl_devolucao = Coalesce(o_vl_devolucao,0);
-      end
-   end
-   O_VL_IMPSAIDA     = coalesce(:O_VL_IMPSAIDA,0);
-   O_VL_OUTROSDEB    = coalesce(:O_VL_OUTROSDEB,0);
-   O_VL_ESTORNOCRED  = coalesce(:O_VL_ESTORNOCRED,0);
-   O_VL_TOTALDEBITO  = coalesce(:O_VL_TOTALDEBITO,0);
-   O_VL_SALDOCREDANT = coalesce(:O_VL_SALDOCREDANT,0);
-   O_VL_IMPENTRADA   = coalesce(:O_VL_IMPENTRADA,0);
-   O_VL_OUTROSCRED   = coalesce(:O_VL_OUTROSCRED,0);
-   O_VL_ESTORNODEB   = coalesce(:O_VL_ESTORNODEB,0);
-   O_VL_TOTALCREDITO = coalesce(:O_VL_TOTALCREDITO,0);
-   O_VL_RECOLHER     = coalesce(:O_VL_RECOLHER,0);
-   O_VL_SALDOCREDOR  = coalesce(:O_VL_SALDOCREDOR,0);
-   O_VL_DEDUCOES     = coalesce(:O_VL_DEDUCOES,0);
-   suspend;
-end^
+            --[ Imposto a Recolher ou Imposto Credor ]--
+            IF ((:O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO) > 0) THEN
+            BEGIN
+                O_VL_RECOLHER = :O_VL_TOTALDEBITO - :O_VL_TOTALCREDITO;
+                O_VL_SALDOCREDOR = 0;
+            END
+            ELSE
+            BEGIN
+                O_VL_RECOLHER = 0;
+                O_VL_SALDOCREDOR = :O_VL_TOTALCREDITO - :O_VL_TOTALDEBITO;
+            END
+            SELECT SUM(V.VL_SUBSTRIB)
+            FROM VIEW_LIVROFISCAL(' AND N.CD_EMPRESA = ' || :I_CD_EMPRESA || ' AND N.DT_EMISSAO BETWEEN ''' || :I_DT_INICIAL || ''' AND ''' || :I_DT_FINAL || '''  AND IT.TP_ITEM <> ''S'' AND N.ST_NOTA = ''V'' AND ((N.TP_NOTA = ''E'') AND (IT.ST_DEVOLUCAO = ''D''))  AND N.SG_ESTADO = ''' || :I_SG_ESTADO || '''', '  AND IP.TP_IMPOSTO = ''I''  AND IP.VL_BASESUBST > 0 AND IT.CD_CFO IN (1410, 1411, 1414, 1415, 1660, 1661, 1662, 2410, 2411, 2414, 2415, 2660, 2661, 2662) ', ' AND 1=2 ') V
+            INTO :O_VL_DEVOLUCAO;
+            O_VL_DEVOLUCAO = COALESCE(O_VL_DEVOLUCAO, 0);
+        END
+    END
+    O_VL_IMPSAIDA = COALESCE(:O_VL_IMPSAIDA, 0);
+    O_VL_OUTROSDEB = COALESCE(:O_VL_OUTROSDEB, 0);
+    O_VL_ESTORNOCRED = COALESCE(:O_VL_ESTORNOCRED, 0);
+    O_VL_TOTALDEBITO = COALESCE(:O_VL_TOTALDEBITO, 0);
+    O_VL_SALDOCREDANT = COALESCE(:O_VL_SALDOCREDANT, 0);
+    O_VL_IMPENTRADA = COALESCE(:O_VL_IMPENTRADA, 0);
+    O_VL_OUTROSCRED = COALESCE(:O_VL_OUTROSCRED, 0);
+    O_VL_ESTORNODEB = COALESCE(:O_VL_ESTORNODEB, 0);
+    O_VL_TOTALCREDITO = COALESCE(:O_VL_TOTALCREDITO, 0);
+    O_VL_RECOLHER = COALESCE(:O_VL_RECOLHER, 0);
+    O_VL_SALDOCREDOR = COALESCE(:O_VL_SALDOCREDOR, 0);
+    O_VL_DEDUCOES = COALESCE(:O_VL_DEDUCOES, 0);
+    SUSPEND;
+END^
 
 SET TERM ; ^
 
